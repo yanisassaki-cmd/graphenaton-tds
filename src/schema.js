@@ -9,6 +9,7 @@ export const SPEC_FIELDS = [
   { key: 'currentPeak', label: 'Current at peak power (A)', dual: true },
   { key: 'tempAvg', label: 'Average Surface Temperature (°C)' },
   { key: 'tempMax', label: 'Maximum Surface Temperature (°C)' },
+  { key: 'tempAmbient', label: 'Operating ambient temperature (°C)' },
   { key: 'heatUp', label: 'Heat-up Time (Seconds)' },
   { key: 'emissivity', label: 'Radiative / Convective / Conductive emissivity (%)' },
   { key: 'resistance', label: 'Electrical Resistance at 20°C (Ω)' },
@@ -49,6 +50,15 @@ export const DEFAULT_BRAND = {
   disclaimer: DISCLAIMER,
 }
 
+// Valeurs par défaut des specs : presets, blankProduct, et produits mémorisés auxquels il manque une clé.
+const defaultSpecs = () => ({
+  voltage: '230-240', frequency: '50-60',
+  powerNom: ['', ''], currentNom: ['', ''], currentPeak: ['', ''],
+  tempAvg: '', tempMax: '', tempAmbient: '0 to +40', heatUp: '', emissivity: '60 / 30 / 10',
+  resistance: '', dielectric: '> 3000', cop: '1', ir: 'Lambertian',
+  endurance: '< 5%', ip: '', weight: '', thickness: '', thicknessLam: '', warranty: '10 years',
+})
+
 const base = (o) => ({
   id: o.id,
   name: o.name,
@@ -57,14 +67,7 @@ const base = (o) => ({
   titleSuffix: o.titleSuffix ?? '',
   subtitle: o.subtitle,
   date: o.date,
-  specs: {
-    voltage: '230-240', frequency: '50-60',
-    powerNom: ['', ''], currentNom: ['', ''], currentPeak: ['', ''],
-    tempAvg: '', tempMax: '', heatUp: '', emissivity: '60 / 30 / 10',
-    resistance: '', dielectric: '> 3000', cop: '1', ir: 'Lambertian',
-    endurance: '< 5%', ip: '', weight: '', thickness: '', thicknessLam: '', warranty: '10 years',
-    ...o.specs,
-  },
+  specs: { ...defaultSpecs(), ...o.specs },
   dims: { outerW: 370, outerH: 673, activeH: 627, tabOffset: 17, tabW: 5, tabGap: 3, filmW: 370, filmH: 673, ...o.dims },
   schemaImage: o.schemaImage ?? '', // data URL (PNG/JPG) du schéma coté ; vide = cadre « Schéma du film à charger »
   curveImage: o.curveImage ?? '',   // data URL (PNG/JPG) de la courbe de montée en température ; vide = cadre « Courbe à charger »
@@ -109,8 +112,9 @@ export const PRESETS = [
 export const blankProduct = () =>
   base({ id: 'new-' + Date.now(), name: 'Nouveau produit', variant: 'film', productNumber: '000', subtitle: '', date: '', specs: {}, dims: {} })
 
-// Complète un produit venant du localStorage ou d'un JSON exporté par une version antérieure (clés images absentes).
-export const normalizeProduct = (p) => ({ schemaImage: '', curveImage: '', ...p })
+// Complète un produit venant du localStorage ou d'un JSON exporté par une version antérieure :
+// clés images absentes, specs ajoutées depuis (ex. tempAmbient). Une valeur vidée volontairement ('') est conservée.
+export const normalizeProduct = (p) => ({ schemaImage: '', curveImage: '', ...p, specs: { ...defaultSpecs(), ...(p.specs || {}) } })
 
 export const isLaminated = (p) => p.variant !== 'film'
 export const slug = (p) => 'TDS_' + p.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.pdf'
