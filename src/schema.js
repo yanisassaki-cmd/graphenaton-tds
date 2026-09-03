@@ -60,19 +60,73 @@ const defaultSpecs = () => ({
   endurance: '< 5%', ip: '', weight: '', thickness: '', thicknessLam: '', warranty: '10 years',
 })
 
+// Contenus par défaut de la page 2 selon la version (film nu / laminé alu / laminé plâtre). Textes en anglais,
+// partagés entre les fiches EN et FR ; modifiables produit par produit dans l'onglet Produit.
+const APPLICATIONS = {
+  film: [
+    'Mobility: Cabin, seat and floor heating for EV, buses and rail; fast warm-up at low power',
+    'Ceiling heating panels: Radiant panels for offices, retail and housing; uniform low-temperature heat',
+    'Underfloor heating: Dry systems under laminate, tiles or carpet; very thin build-up',
+    'Wall panels and mirrors: Decorative radiant panels, anti-fog mirrors, bathroom heaters',
+    'Furniture and appliances: Heated desks, benches, incubators, warming drawers',
+    'Industrial processes: Anti-condensation of enclosures, drying, battery thermal management',
+    'De-icing: Gutters, sensors and camera housings, outdoor equipment',
+    'Wellness and healthcare: Infrared cabins, physiotherapy pads, animal care',
+  ],
+  alu: [
+    'Ceiling heating panels: Suspended radiant panels for offices, schools and retail',
+    'Wall-mounted radiant heaters: Slim panels for housing, hotels and bathrooms',
+    'Mobility: Floor and wall heating in buses, trains and camper vans',
+    'Industrial enclosures: Frost protection and anti-condensation for cabinets and equipment',
+    'Outdoor and public spaces: Waiting areas, terraces and shelters with directional radiant heat',
+    'Drying and process heat: Uniform plate heating for curing, drying and warming',
+  ],
+  plaster: [
+    'Ceiling heating: Invisible radiant heating integrated in plasterboard ceilings',
+    'Wall heating: Heated plaster walls for housing, hotels and offices',
+    'Renovation: Low build-up alternative to underfloor heating in existing buildings',
+    'Bathrooms: Warm walls and ceilings, dry surfaces, no visible heater',
+    'Low-energy buildings: Low-temperature radiant comfort with minimal power',
+  ],
+}
+const INTEGRATION = {
+  film: ['Self-adhesive film to be integrated into a thermally controlled system', 'Over-temperature protection ensured at system level', 'Electrical protection compliant with applicable standards', 'Proper thermal contact with the support structure'],
+  alu: ['Component to be integrated into a thermally controlled system', 'Over-temperature protection ensured at system level', 'Electrical protection compliant with applicable standards', 'Mechanical fixing on the aluminium plate, free air circulation on the radiant face'],
+  plaster: ['Component to be integrated into a ceiling or wall system', 'Over-temperature protection ensured at system level', 'Electrical protection compliant with applicable standards', 'Finishing coat and paint compatible with radiant heating'],
+}
+const CONSTRUCTION = {
+  film: 'Printed graphene encapsulated by insulating polymeric layers',
+  alu: 'Graphene heating film laminated onto an aluminium plate',
+  plaster: 'Graphene heating film laminated onto a plasterboard',
+}
+const v = (m, variant) => m[variant] ?? m.film
+export const page2Defaults = (variant) => ({
+  applicationList: v(APPLICATIONS, variant).join('\n'),
+  integration: v(INTEGRATION, variant).join('\n'),
+  storage: 'Clean, stable environment at ambient room temperature (< 50°C), relative humidity 20-80%',
+  compliance: 'Designed for integration into CE-marked equipment\nCompliant with Directive 2011/65/EU (RoHS)\nCompliant with Regulation (EC) No 1907/2006 (REACH)',
+  testConditions: 'Voltage: 230 V; Ambient temperature: 20 °C; Still air (no forced convection); Temperature measurement: 9 thermocouples on the active surface',
+  footnotes: '* Subject to proper use and application of the product.\n** Peak power corresponds to transient conditions during warm-up phase and is not intended for continuous operation.',
+  mech: { length: '', width: '', activeSurface: '', construction: v(CONSTRUCTION, variant) },
+})
+const PAGE2_TEXT_KEYS = ['applicationList', 'integration', 'storage', 'compliance', 'testConditions', 'footnotes']
+
 // Champs additionnels d'un produit (import Excel, courbe) et leurs valeurs par défaut.
 const defaultExtras = () => ({
   fileRef: '',                          // référence du nom de fichier PDF (Excel « Référence (nom fichier PDF) ») ; vide = nom du produit
   curveMode: 'none',                    // 'none' (pas de section) | 'image' (curveImage) | 'generated' (curvePoints via curve.js)
   curvePoints: [],                      // [{ t, temp }] points de la courbe de montée en température (onglet Courbes)
   curveAxis: { tMax: '', tempMax: '' }, // bornes des axes de la courbe ; vide = automatique
-  page2Enabled: false,                  // seconde page A4 avec les textes ci-dessous (sections vides masquées)
-  applications: '', integration: '', storage: '', compliance: '', testConditions: '', footnotes: '',
+  page2Enabled: false,                  // seconde page A4 (applications, intégration, mécanique, conformité… ; sections vides masquées)
+  applications: '',                     // paragraphe d'introduction sous APPLICATIONS
+  applicationList: '',                  // cartes « Titre : description », une par ligne (voir page2Defaults)
+  integration: '', storage: '', compliance: '', testConditions: '', footnotes: '',
+  mech: { length: '', width: '', activeSurface: '', construction: '' }, // tableau mécanique ; longueur / largeur reprennent les cotes si vides
 })
 
 // Sections de la page 2, dans l'ordre d'affichage. Libellés de l'éditeur (FR) ; titres de la fiche dans i18n.page2.
 export const PAGE2_FIELDS = [
-  { key: 'applications', label: 'Applications' },
+  { key: 'applications', label: 'Introduction (paragraphe sous le titre APPLICATIONS)' },
   { key: 'integration', label: 'Intégration' },
   { key: 'storage', label: 'Stockage' },
   { key: 'compliance', label: 'Conformité et réglementation' },
@@ -82,6 +136,7 @@ export const PAGE2_FIELDS = [
 
 const base = (o) => ({
   ...defaultExtras(),
+  ...page2Defaults(o.variant),
   id: o.id,
   name: o.name,
   variant: o.variant, // 'film' | 'alu' | 'plaster'
@@ -96,6 +151,7 @@ const base = (o) => ({
   fileRef: o.fileRef ?? '',
   curvePoints: o.curvePoints ?? [],
   curveAxis: { tMax: '', tempMax: '', ...o.curveAxis },
+  mech: { ...page2Defaults(o.variant).mech, ...o.mech },
 })
 
 export const PRESETS = [
@@ -139,13 +195,20 @@ export const blankProduct = () =>
 
 // Complète un produit venant du localStorage ou d'un JSON exporté par une version antérieure :
 // clés images absentes, specs ajoutées depuis (ex. tempAmbient). Une valeur vidée volontairement ('') est conservée.
-export const normalizeProduct = (p) => ({
-  ...defaultExtras(), schemaImage: '', curveImage: '', ...p,
-  specs: { ...defaultSpecs(), ...(p.specs || {}) },
-  curveAxis: { tMax: '', tempMax: '', ...(p.curveAxis || {}) },
-  // produits d'avant le choix de mode : image chargée → 'image', points présents → 'generated', sinon 'none'
-  curveMode: p.curveMode ?? (p.curveImage ? 'image' : (p.curvePoints || []).length >= 2 ? 'generated' : 'none'),
-})
+export const normalizeProduct = (p) => {
+  const d2 = page2Defaults(p.variant)
+  const n = {
+    ...defaultExtras(), schemaImage: '', curveImage: '', ...p,
+    specs: { ...defaultSpecs(), ...(p.specs || {}) },
+    curveAxis: { tMax: '', tempMax: '', ...(p.curveAxis || {}) },
+    // produits d'avant le choix de mode : image chargée → 'image', points présents → 'generated', sinon 'none'
+    curveMode: p.curveMode ?? (p.curveImage ? 'image' : (p.curvePoints || []).length >= 2 ? 'generated' : 'none'),
+    mech: { ...d2.mech, ...(p.mech || {}) },
+  }
+  // Textes de page 2 jamais renseignés (absents ou vides) : contenus par défaut de la version.
+  for (const k of PAGE2_TEXT_KEYS) if (!String(n[k] || '').trim()) n[k] = d2[k]
+  return n
+}
 
 export const isLaminated = (p) => p.variant !== 'film'
 // Nom du fichier PDF : TDS_<nom>_EN.pdf / TDS_<nom>_FR.pdf

@@ -31,7 +31,9 @@ const en = {
     compliance: 'COMPLIANCE AND REGULATORY',
     testConditions: 'TEST CONDITIONS',
     footnotes: 'NOTES',
+    mech: 'MECHANICAL SPECIFICATIONS',
   },
+  mech: { length: 'Length (mm)', width: 'Width (mm)', activeSurface: 'Active surface (mm)', thickness: 'Film thickness (mm)', thicknessLam: 'Total thickness (mm)', weight: 'Weight (g)', construction: 'Construction' },
   subs: { dielectric: '(IEC 60335-1 : 2023 + A11 : 2023)' },
   specs: {
     voltage: 'Operating Voltage (V)',
@@ -76,7 +78,9 @@ const fr = {
     compliance: 'CONFORMITÉ ET RÉGLEMENTATION',
     testConditions: 'CONDITIONS D\'ESSAI',
     footnotes: 'NOTES',
+    mech: 'SPÉCIFICATIONS MÉCANIQUES',
   },
+  mech: { length: 'Longueur (mm)', width: 'Largeur (mm)', activeSurface: 'Surface active (mm)', thickness: 'Épaisseur du film (mm)', thicknessLam: 'Épaisseur totale (mm)', weight: 'Poids (g)', construction: 'Construction' },
   subs: { dielectric: '(IEC 60335-1 : 2023 + A11 : 2023)' },
   specs: {
     voltage: 'Tension de fonctionnement (V)',

@@ -1,8 +1,10 @@
 import React, { useEffect, useReducer } from 'react'
-import { SPEC_FIELDS, PAGE2_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
+import { SPEC_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
 import { productFontSize } from './header'
 import { t, specLabel, disclaimerOf } from './i18n'
 import { computeCurve, hasCurveData } from './curve'
+import { ICONS, ICON_VIEW } from './icons'
+import { parseApplications, lines, complianceBadges, mechRows, hasText } from './page2'
 
 // Hauteurs max des images (px écran) : miroir des valeurs en pt de TdsPdf.jsx (× 1,333) pour que l'aperçu
 // reflète la mise en page du PDF. Le schéma coté généré (src/drawing.js) n'est plus utilisé par défaut.
@@ -19,19 +21,27 @@ function Figure({ src, placeholder, maxH }) {
   return <div className="box"><img src={src} alt="" style={{ maxHeight: maxH }} /></div>
 }
 
-// Courbe générée (src/curve.js) en SVG.
-function CurveSvg({ p, T }) {
-  const { prims, viewW, viewH } = computeCurve(p.curvePoints, p.curveAxis, { x: T.curveX, y: T.curveY })
+// Rendu SVG des primitives partagées (curve.js, icons.js) : line / path / circle / rect / text.
+function PrimsSvg({ prims, viewW, viewH, className }) {
   return (
-    <svg viewBox={`0 0 ${viewW} ${viewH}`} width="100%" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox={`0 0 ${viewW} ${viewH}`} className={className} xmlns="http://www.w3.org/2000/svg">
       {prims.map((q, i) => {
-        if (q.t === 'line') return <line key={i} x1={q.x1} y1={q.y1} x2={q.x2} y2={q.y2} stroke={q.stroke} strokeWidth={q.sw} />
-        if (q.t === 'path') return <path key={i} d={q.d} fill="none" stroke={q.stroke} strokeWidth={q.sw} strokeLinejoin="round" strokeLinecap="round" />
-        if (q.t === 'circle') return <circle key={i} cx={q.cx} cy={q.cy} r={q.r} fill={q.fill} />
+        if (q.t === 'line') return <line key={i} x1={q.x1} y1={q.y1} x2={q.x2} y2={q.y2} stroke={q.stroke} strokeWidth={q.sw} strokeLinecap="round" />
+        if (q.t === 'path') return <path key={i} d={q.d} fill={q.fill || 'none'} stroke={q.stroke} strokeWidth={q.sw} strokeLinejoin="round" strokeLinecap="round" />
+        if (q.t === 'circle') return <circle key={i} cx={q.cx} cy={q.cy} r={q.r} fill={q.fill || 'none'} stroke={q.stroke} strokeWidth={q.sw} />
+        if (q.t === 'rect') return <rect key={i} x={q.x} y={q.y} width={q.width} height={q.height} rx={q.rx} fill={q.fill || 'none'} stroke={q.stroke} strokeWidth={q.sw} />
         return <text key={i} transform={`translate(${q.x},${q.y}) rotate(${q.rotate})`} fontSize={q.size} fontWeight={q.weight} fill={q.fill} textAnchor={q.anchor} fontFamily="Inter, Arial, sans-serif">{q.s}</text>
       })}
     </svg>
   )
+}
+
+const Icon = ({ name, className }) => <PrimsSvg prims={ICONS[name] || ICONS.dot} viewW={ICON_VIEW} viewH={ICON_VIEW} className={className} />
+
+// Courbe générée (src/curve.js) en SVG.
+function CurveSvg({ p, T }) {
+  const { prims, viewW, viewH } = computeCurve(p.curvePoints, p.curveAxis, { x: T.curveX, y: T.curveY })
+  return <PrimsSvg prims={prims} viewW={viewW} viewH={viewH} className="curve" />
 }
 
 // Contenu de la section courbe selon le mode : 'image' | 'svg' | 'placeholder' (aperçu seulement) | null (section absente).
@@ -62,14 +72,54 @@ function SheetHeader({ p, brand, T, nameSize }) {
 
 const Footer = ({ brand }) => <div className="sheet-footer"><span>{brand.address}</span><b>{brand.site}</b></div>
 
-// Page 2 optionnelle : sections texte (applications, intégration…) ; les sections vides sont omises.
-function Page2({ p, brand, T, nameSize }) {
-  const secs = PAGE2_FIELDS.filter((f) => String(p[f.key] || '').trim())
+const CheckList = ({ items }) => <ul className="chk">{items.map((l, i) => <li key={i}><Icon name="check" className="tick" />{l}</li>)}</ul>
+
+// Page 2 optionnelle : applications en cartes, intégration / stockage / conditions d'essai, tableau mécanique,
+// conformité avec badges, notes. Les sections vides sont omises.
+function Page2({ p, brand, T, nameSize, lam }) {
+  const apps = parseApplications(p.applicationList)
+  const integ = lines(p.integration), compl = lines(p.compliance), badges = complianceBadges(p.compliance), mech = mechRows(p, T, lam)
+  const left = integ.length > 0 || hasText(p.storage) || hasText(p.testConditions)
+  const right = mech.length > 0 || compl.length > 0
   return (
     <div className="sheet p2">
       <SheetHeader p={p} brand={brand} T={T} nameSize={nameSize} />
       <div className="p2-body">
-        {secs.map((f) => <div key={f.key} className="p2-sec"><h2>{T.page2[f.key]}</h2><p>{p[f.key]}</p></div>)}
+        {(hasText(p.applications) || apps.length > 0) && (
+          <div className="p2-sec">
+            <h2>{T.page2.applications}</h2>
+            {hasText(p.applications) && <p className="p2-intro">{p.applications}</p>}
+            {apps.length > 0 && (
+              <div className="cards">
+                {apps.map((a, i) => (
+                  <div key={i} className="card"><Icon name={a.icon} className="ico" /><div><b>{a.title}</b>{a.desc && <span>{a.desc}</span>}</div></div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {(left || right) && (
+          <div className="p2-cols">
+            <div className="p2-left">
+              {integ.length > 0 && <div className="p2-sec"><h2>{T.page2.integration}</h2><CheckList items={integ} /></div>}
+              {hasText(p.storage) && <div className="p2-sec"><h2>{T.page2.storage}</h2><p>{p.storage}</p></div>}
+              {hasText(p.testConditions) && <div className="p2-sec"><h2>{T.page2.testConditions}</h2><p>{p.testConditions}</p></div>}
+            </div>
+            <div className="p2-right">
+              {mech.length > 0 && (
+                <div className="p2-sec"><h2>{T.page2.mech}</h2>
+                  <table className="mech"><tbody>{mech.map((r) => <tr key={r.key}><td>{r.label}</td><td className="v">{r.value}</td></tr>)}</tbody></table>
+                </div>
+              )}
+              {compl.length > 0 && (
+                <div className="p2-sec"><h2>{T.page2.compliance}</h2><CheckList items={compl} />
+                  {badges.length > 0 && <div className="pills">{badges.map((b) => <span key={b}>{b}</span>)}</div>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {hasText(p.footnotes) && <div className="p2-notes"><h2>{T.page2.footnotes}</h2><p>{p.footnotes}</p></div>}
       </div>
       <Footer brand={brand} />
     </div>
@@ -121,7 +171,7 @@ export default function Preview({ product: p, brand = DEFAULT_BRAND, lang = 'en'
         </div>
         <Footer brand={brand} />
       </div>
-      {p.page2Enabled && <Page2 p={p} brand={brand} T={T} nameSize={nameSize} />}
+      {p.page2Enabled && <Page2 p={p} brand={brand} T={T} nameSize={nameSize} lam={lam} />}
     </>
   )
 }

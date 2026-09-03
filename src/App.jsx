@@ -94,6 +94,7 @@ export default function App() {
   }, [])
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState('')
+  const [p2Over, setP2Over] = useState(0) // dépassement (px) de la page 2 dans l'aperçu, pour prévenir avant le PDF
   const fileRef = useRef()
   const xlsRef = useRef()
 
@@ -110,6 +111,11 @@ export default function App() {
 
   const p = products[Math.min(sel, products.length - 1)]
   const lam = isLaminated(p)
+  useEffect(() => {
+    if (!p.page2Enabled) { setP2Over(0); return }
+    let raf = requestAnimationFrame(() => { const el = document.querySelector('.sheet.p2'); setP2Over(el ? Math.max(0, el.scrollHeight - el.clientHeight) : 0) })
+    return () => cancelAnimationFrame(raf)
+  }, [p, lang, brand, tab])
 
   const update = (fn) => setProducts((arr) => arr.map((x, i) => (i === sel ? fn(clone(x)) : x)))
   const setMeta = (k, v) => update((x) => { x[k] = v; return x })
@@ -120,6 +126,7 @@ export default function App() {
   const addPoint = () => update((x) => { x.curvePoints = [...(x.curvePoints || []), { t: '', temp: '' }]; return x })
   const delPoint = (i) => update((x) => { x.curvePoints.splice(i, 1); return x })
   const setAxis = (k, v) => update((x) => { x.curveAxis = { ...(x.curveAxis || {}), [k]: v }; return x })
+  const setMech = (k, v) => update((x) => { x.mech = { ...(x.mech || {}), [k]: v }; return x })
 
   // Upload d'une image produit (schemaImage / curveImage) : redimensionnée puis stockée dans l'objet produit.
   const onImage = (key, done) => async (e) => {
@@ -346,8 +353,17 @@ export default function App() {
           <label className="check"><input type="checkbox" checked={!!p.page2Enabled} onChange={(e) => setMeta('page2Enabled', e.target.checked)} />Ajouter une page 2 (applications, intégration, conformité)</label>
           {p.page2Enabled && (
             <div className="grid">
-              {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows="4" value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
-              <p className="hint wide" style={{ margin: 0 }}>Une ligne par point (retour à la ligne). Les sections vides n'apparaissent pas sur la page 2.</p>
+              {p2Over > 6 && <div className="warn wide" style={{ margin: 0 }}>La page 2 déborde d'environ {Math.round(p2Over)} px dans l'aperçu : raccourcissez l'introduction, les notes ou retirez une carte, sinon le PDF passera sur une 3e page.</div>}
+              <label className="wide">Applications en cartes : une par ligne, « Titre : description »<textarea rows="9" value={p.applicationList ?? ''} onChange={(e) => setMeta('applicationList', e.target.value)} /></label>
+              <p className="hint wide" style={{ margin: '-4px 0 0' }}>Le pictogramme est choisi d'après le titre : mobilité / véhicule, plafond, sol, mur, siège / mobilier, industriel, dégivrage / extérieur, bien-être / médical ; sinon un point teal.</p>
+              {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows={f.key === 'applications' ? 3 : 4} value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
+              <p className="hint wide" style={{ margin: 0 }}>Intégration et conformité : une ligne par point (affichées avec une coche ; badges CE / RoHS / REACH détectés). Les sections vides n'apparaissent pas.</p>
+              <h3 className="wide" style={{ margin: '6px 0 0' }}>Spécifications mécaniques (page 2)</h3>
+              <label>Longueur (mm)<input value={p.mech?.length ?? ''} placeholder={String(p.dims.outerH ?? '')} onChange={(e) => setMech('length', e.target.value)} /></label>
+              <label>Largeur (mm)<input value={p.mech?.width ?? ''} placeholder={String(p.dims.outerW ?? '')} onChange={(e) => setMech('width', e.target.value)} /></label>
+              <label>Surface active (mm)<input value={p.mech?.activeSurface ?? ''} placeholder="620 x 360" onChange={(e) => setMech('activeSurface', e.target.value)} /></label>
+              <label>Construction<input value={p.mech?.construction ?? ''} onChange={(e) => setMech('construction', e.target.value)} /></label>
+              <p className="hint wide" style={{ margin: 0 }}>Épaisseur et poids sont repris des specs ; longueur et largeur reprennent les cotes du schéma si vides.</p>
             </div>
           )}
         </section>

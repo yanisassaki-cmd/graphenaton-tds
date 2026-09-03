@@ -41,7 +41,12 @@ export const FIELD_MAP = {
   'Ingress Protection': 'specs.ip',
   'Warranty': 'specs.warranty',
   'Conditions de mesure (texte)': 'testConditions',
-  // Specs mécaniques
+  // Specs mécaniques (tableau « Mechanical specifications » de la page 2)
+  'Length (mm)': 'mech.length',
+  'Width (mm)': 'mech.width',
+  'Active surface (mm)': 'mech.activeSurface',
+  'Construction': 'mech.construction',
+  'Applications (liste)': 'applicationList',
   'Thickness of the heating film (mm)': 'specs.thickness',
   'Total thickness laminated (mm)': 'specs.thicknessLam',
   'Weight (g)': 'specs.weight',
@@ -63,7 +68,7 @@ export const FIELD_MAP = {
 }
 
 // Champs texte multi-lignes : « a | b | c » dans une cellule devient trois lignes.
-const MULTILINE = new Set(['applications', 'integration', 'storage', 'compliance', 'testConditions', 'footnotes'])
+const MULTILINE = new Set(['applications', 'applicationList', 'integration', 'storage', 'compliance', 'testConditions', 'footnotes'])
 
 export const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[–—−]/g, '-').replace(/\*/g, '').replace(/\s+/g, ' ').trim()
