@@ -1,6 +1,8 @@
 // En-tête : nom du produit (« ABF® 800 », « ABF® 400 ALU ») et taille de police ajustée pour qu'il tienne
 // sur une seule ligne à droite du bloc « TECHNICAL DATASHEET ». Tailles en px aperçu ; le PDF applique × 0,75.
 
+import { t } from './i18n'
+
 export const HEADER = { width: 688, gap: 20, title: 30, line: 24, product: 46, productMin: 26 }
 
 export const productName = (p) => `ABF® ${p.productNumber}${p.titleSuffix ? ' ' + p.titleSuffix : ''}`
@@ -14,10 +16,10 @@ const measure = (text, font) => {
 }
 
 // Largeur du bloc de gauche = ligne la plus large ; le nom du produit dispose du reste (marge de 3 %).
-export function productFontSize(p, brand) {
+export function productFontSize(p, brand, lang = 'en') {
   try {
     const left = Math.max(
-      measure('TECHNICAL DATASHEET', `700 ${HEADER.title}px ${FAMILY}`),
+      measure(t(lang).title, `700 ${HEADER.title}px ${FAMILY}`),
       measure(brand.headerCompany || '', `400 ${HEADER.line}px ${FAMILY}`),
       measure(p.date || 'date', `400 ${HEADER.line}px ${FAMILY}`),
     )

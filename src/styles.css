@@ -46,6 +46,9 @@ button,input,select{font:inherit;color:inherit}
 .ed-btns .primary:hover{background:#1f2a4d}
 .ed-btns .danger{color:var(--red)}
 .ed-btns button:disabled{opacity:.5;cursor:default}
+.ed-btns .lang-sw{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ed-btns .lang-sw button{border:0;border-radius:0;padding:8px 10px;color:var(--grey);font-weight:600;font-size:12px;letter-spacing:.5px}
+.ed-btns .lang-sw button.on{background:var(--navy);color:#fff}
 .warn{margin:14px 0 0;padding:10px 12px;background:#FFF2CC;border-left:4px solid #E0A800;border-radius:4px;font-size:12px;line-height:1.4}
 section{margin-top:22px}
 section h3{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.8px;text-transform:uppercase;margin:0 0 10px}
@@ -58,7 +61,7 @@ section h3{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.8px;
 
 /* preview */
 .preview-wrap{overflow:auto;padding:24px;display:flex;justify-content:center;align-items:flex-start}
-.preview-scale{transform-origin:top center;transform:scale(var(--pv,0.8))}
+.preview-scale{transform-origin:top center;transform:scale(var(--pv,0.8));display:flex;flex-direction:column;align-items:center;gap:24px}
 @media (max-width:1500px){.preview-scale{--pv:0.66}}
 @media (max-width:1300px){.preview-scale{--pv:0.55}}
 @media (max-width:1100px){.app{grid-template-columns:200px 1fr}.preview-wrap{display:none}}
@@ -103,3 +106,66 @@ section h3{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.8px;
 .sheet .box img{display:block;width:100%;object-fit:contain}
 .sheet .box.ph{border:1.5px dashed #B8BEC8;background:#fff;height:160px;display:grid;place-items:center;color:var(--muted);font-size:10px;letter-spacing:.3px}
 .sheet h2.mt{margin-top:16px}
+
+/* page 2 (preview) */
+.sheet .p2-body{margin-top:22px}
+.sheet .p2-sec{margin-bottom:18px}
+.sheet .p2-sec h2{margin-bottom:8px}
+.sheet .p2-sec p{margin:0;font-size:11.5px;line-height:1.5;white-space:pre-line}
+
+/* editor: curve mode + points table */
+.radios{display:flex;flex-wrap:wrap;gap:6px 16px;margin-bottom:12px}
+.radios label{display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;color:var(--navy)}
+.radios input{margin:0}
+.pts table{width:100%;border-collapse:collapse;margin-bottom:8px}
+.pts th{font-size:11px;color:var(--grey);font-weight:500;text-align:left;padding:0 4px 4px 0}
+.pts td{padding:2px 6px 2px 0}
+.pts td:last-child{width:32px;padding-right:0}
+.pts td input{border:1px solid var(--line);border-radius:5px;padding:5px 8px;width:100%;font-size:12.5px;color:var(--navy);outline:none;background:#fff}
+.pts td input:focus{border-color:var(--teal)}
+.pts .x{border:1px solid var(--line);background:#fff;border-radius:5px;width:28px;height:28px;cursor:pointer;color:var(--grey);font-size:16px;line-height:1}
+.pts .x:hover{color:var(--red);border-color:var(--red)}
+.pts .row2{display:flex;gap:8px;margin-bottom:10px}
+.pts .row2 button{padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.sheet .box svg{display:block;width:100%}
+
+/* editor: checkbox */
+.check{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:10px;cursor:pointer;color:var(--navy)}
+.check input{width:15px;height:15px;margin:0}
+.grid .hint.wide{grid-column:1/-1}
+
+/* ---------- Mobile (< 700 px) : autre mise en page, la version ordinateur ci-dessus est inchangée ---------- */
+.m-only{display:none}
+@media (max-width:700px){
+  .m-only{display:block}
+  .app{display:flex;flex-direction:column;height:auto;min-height:100vh;overflow:visible}
+  /* barre du haut : logo, sélecteur de produit, actions de la base en ligne défilante */
+  .side{height:auto;overflow:visible}
+  .side-head{padding:10px 12px 8px;border-bottom:0}
+  .side-logo .g{width:28px;height:28px;font-size:15px;border-width:2px}
+  .side-logo{font-size:12px}
+  .plist{display:none}
+  .plist-select{margin:0 12px 8px;padding:9px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.25);background:var(--navy);color:#fff;font-size:14px;width:calc(100% - 24px)}
+  .side-actions{flex-direction:row;overflow-x:auto;padding:8px 12px 10px;gap:6px;-webkit-overflow-scrolling:touch}
+  .side-actions .row2{display:contents}
+  .side-actions button{width:auto;white-space:nowrap;padding:7px 10px;font-size:12px;flex:0 0 auto}
+  .side-actions button.quiet{font-size:12px}
+  /* éditeur : une colonne, boutons à la ligne, bouton PDF pleine largeur */
+  .editor{overflow:visible;border-right:0;padding:0 12px 24px}
+  .tabs{gap:0}
+  .tabs button{flex:1;padding:8px 4px;font-size:13px}
+  .tabs button.m-only{display:block}
+  .ed-head{padding:12px 0 10px}
+  .ed-btns{flex-wrap:wrap}
+  .ed-btns .primary{flex:1 1 100%;margin-left:0;order:9}
+  .ed-btns .lang-sw{margin-left:auto}
+  .grid{grid-template-columns:1fr}
+  .grid label.dual span{grid-template-columns:1fr 1fr}
+  /* aperçu : onglet dédié, fiche mise à l'échelle de l'écran (zoom, pas transform, pour garder une hauteur cohérente) */
+  .preview-wrap{display:none;padding:12px;background:var(--bg)}
+  .preview-wrap.on{display:flex}
+  .app.tab-preview .editor > :not(.tabs){display:none !important} /* onglet Aperçu : le formulaire est masqué, la fiche suit les onglets */
+  .app.tab-preview .editor{padding-bottom:0}
+  .preview-scale{transform:none;zoom:var(--pvm,0.45);gap:16px}
+  .preview-wrap.on ~ .toast,.toast{max-width:calc(100vw - 24px);text-align:center}
+}

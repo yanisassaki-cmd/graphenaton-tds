@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
-import { PRESETS, SPEC_FIELDS, DIM_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
+import { PRESETS, SPEC_FIELDS, DIM_FIELDS, PAGE2_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
 import Preview from './Preview'
 import TdsPdf from './TdsPdf'
 import { productFontSize } from './header'
+import { LANGS, specLabel } from './i18n'
+import { importExcel } from './excelImport'
+import { hasCurveData } from './curve'
 
 const STORAGE_KEY = 'graphenaton-tds-v1'
 const BRAND_KEY = 'graphenaton-tds-brand-v1'
+const LANG_KEY = 'graphenaton-tds-lang-v1'
 const QUOTA_MSG = 'Stockage du navigateur plein : les dernières modifications ne seront pas mémorisées au rechargement. Retirez une image ou exportez la base en JSON pour la conserver.'
 
 function load() {
@@ -23,6 +27,7 @@ function loadBrand() {
     if (raw) {
       const b = JSON.parse(raw)
       if (b.logoHeight === 44) delete b.logoHeight // ancien défaut de l'en-tête précédent : on reprend le nouveau (90)
+      if (b.disclaimer) { if (!b.disclaimerEn) b.disclaimerEn = b.disclaimer; delete b.disclaimer } // texte légal devenu bilingue
       return { ...DEFAULT_BRAND, ...b }
     }
   } catch {}
@@ -79,9 +84,18 @@ export default function App() {
   const [sel, setSel] = useState(0)
   const [brand, setBrand] = useState(loadBrand)
   const [tab, setTab] = useState('product')
+  const [lang, setLang] = useState(() => { try { return localStorage.getItem(LANG_KEY) || 'en' } catch { return 'en' } })
+  useEffect(() => { try { localStorage.setItem(LANG_KEY, lang) } catch {} }, [lang])
+  // Mobile (< 700 px) : l'onglet « Aperçu » affiche la fiche à l'échelle de l'écran (variable CSS --pvm, voir styles.css).
+  const editTab = tab === 'preview' ? 'product' : tab
+  useEffect(() => {
+    const set = () => document.documentElement.style.setProperty('--pvm', String(Math.min(1, (window.innerWidth - 24) / 794)))
+    set(); window.addEventListener('resize', set); return () => window.removeEventListener('resize', set)
+  }, [])
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState('')
   const fileRef = useRef()
+  const xlsRef = useRef()
 
   // Les images (data URL) peuvent dépasser le quota du localStorage : on prévient sans planter.
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)) } catch { setToast(QUOTA_MSG) } }, [products])
@@ -101,6 +115,11 @@ export default function App() {
   const setMeta = (k, v) => update((x) => { x[k] = v; return x })
   const setSpec = (k, v, idx) => update((x) => { if (idx == null) x.specs[k] = v; else { const a = Array.isArray(x.specs[k]) ? x.specs[k] : ['', '']; a[idx] = v; x.specs[k] = a } return x })
   const setDim = (k, v) => update((x) => { x.dims[k] = v; return x })
+  // Courbe générée : points { t, temp } et bornes des axes
+  const setPoint = (i, k, v) => update((x) => { x.curvePoints[i][k] = v; return x })
+  const addPoint = () => update((x) => { x.curvePoints = [...(x.curvePoints || []), { t: '', temp: '' }]; return x })
+  const delPoint = (i) => update((x) => { x.curvePoints.splice(i, 1); return x })
+  const setAxis = (k, v) => update((x) => { x.curveAxis = { ...(x.curveAxis || {}), [k]: v }; return x })
 
   // Upload d'une image produit (schemaImage / curveImage) : redimensionnée puis stockée dans l'objet produit.
   const onImage = (key, done) => async (e) => {
@@ -122,16 +141,28 @@ export default function App() {
     e.target.value = ''
   }
 
-  const makePdf = async (prod) => (await pdf(<TdsPdf product={prod} brand={brand} nameSize={productFontSize(prod, brand)} />).toBlob())
+  // Import de la base Excel : produits existants mis à jour par nom, nouveaux ajoutés, courbes de l'onglet Courbes.
+  const importXlsx = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = ''; if (!f) return
+    try {
+      const { products: next, brand: b, stats } = importExcel(await f.arrayBuffer(), products)
+      setProducts(next.map(normalizeProduct)); setSel(0)
+      if (b.address || b.site) setBrand((x) => ({ ...x, ...b }))
+      if (stats.unknown.length) console.warn(`Import Excel : ${stats.unknown.length} libellé(s) non reconnu(s) dans l'onglet Produits :`, stats.unknown)
+      setToast(`Excel importé : ${stats.products} produits, ${stats.fields} champs${stats.created.length ? ` (${stats.created.length} nouveau${stats.created.length > 1 ? 'x' : ''})` : ''}${stats.unknown.length ? `. ${stats.unknown.length} libellés non reconnus, voir la console.` : ''}`)
+    } catch (err) { console.error(err); setToast('Excel illisible : onglet « Produits » avec une ligne « CHAMP » attendu') }
+  }
+
+  const makePdf = async (prod) => (await pdf(<TdsPdf product={prod} brand={brand} lang={lang} nameSize={productFontSize(prod, brand, lang)} />).toBlob())
   const exportOne = async () => {
     setBusy('Génération du PDF…')
-    try { download(await makePdf(p), slug(p)); setToast('PDF téléchargé') } catch (err) { console.error(err); setToast('Échec de la génération, voir la console') }
+    try { download(await makePdf(p), slug(p, lang)); setToast('PDF téléchargé') } catch (err) { console.error(err); setToast('Échec de la génération, voir la console') }
     setBusy('')
   }
   const exportAll = async () => {
     for (let i = 0; i < products.length; i++) {
       setBusy(`PDF ${i + 1} / ${products.length}…`)
-      try { download(await makePdf(products[i]), slug(products[i])) } catch (err) { console.error(err) }
+      try { download(await makePdf(products[i]), slug(products[i], lang)) } catch (err) { console.error(err) }
       await new Promise((r) => setTimeout(r, 400))
     }
     setBusy(''); setToast(`${products.length} PDF téléchargés`)
@@ -140,16 +171,17 @@ export default function App() {
   const missing = useMemo(() => {
     const m = []
     if (!p.date) m.push('date'); if (!p.subtitle) m.push('sous-titre')
-    if (!p.schemaImage) m.push('schéma'); if (!p.curveImage) m.push('courbe')
+    if (!p.schemaImage) m.push('schéma')
+    if ((p.curveMode === 'image' && !p.curveImage) || (p.curveMode === 'generated' && !hasCurveData(p))) m.push('courbe')
     SPEC_FIELDS.filter((f) => !f.aluOnly || lam).forEach((f) => {
       const v = p.specs[f.key]
-      if (f.dual ? !(v?.[0] && v?.[1]) : !v) m.push(f.label)
+      if (f.dual ? !(v?.[0] && v?.[1]) : !v) m.push(specLabel(lang, f.key))
     })
     return m
-  }, [p, lam])
+  }, [p, lam, lang])
 
   return (
-    <div className="app">
+    <div className={'app' + (tab === 'preview' ? ' tab-preview' : '')}>
       <aside className="side">
         <div className="side-head">
           <div className="side-logo"><span className="g">G</span><span>GRAPHENATON<small>Générateur de TDS</small></span></div>
@@ -159,6 +191,9 @@ export default function App() {
             <li key={x.id}><button className={i === sel ? 'on' : ''} onClick={() => setSel(i)}>{x.name}<em>{x.variant}</em></button></li>
           ))}
         </ul>
+        <select className="m-only plist-select" value={sel} onChange={(e) => setSel(+e.target.value)} aria-label="Produit">
+          {products.map((x, i) => <option key={x.id} value={i}>{x.name}</option>)}
+        </select>
         <div className="side-actions">
           <button onClick={addProduct}>+ Nouveau produit</button>
           <button onClick={exportAll} disabled={!!busy}>Télécharger tous les PDF</button>
@@ -167,13 +202,15 @@ export default function App() {
             <button onClick={() => fileRef.current.click()}>Importer</button>
             <input ref={fileRef} type="file" accept="application/json" hidden onChange={importJson} />
           </div>
+          <button onClick={() => xlsRef.current.click()}>Importer un Excel</button>
+          <input ref={xlsRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={importXlsx} />
           <button className="quiet" onClick={resetAll}>Restaurer les valeurs par défaut</button>
         </div>
       </aside>
 
       <main className="editor">
-        <div className="tabs"><button className={tab === 'product' ? 'on' : ''} onClick={() => setTab('product')}>Produit</button><button className={tab === 'brand' ? 'on' : ''} onClick={() => setTab('brand')}>Logo et mentions</button></div>
-        {tab === 'brand' && (
+        <div className="tabs"><button className={tab === 'product' ? 'on' : ''} onClick={() => setTab('product')}>Produit</button><button className={tab === 'brand' ? 'on' : ''} onClick={() => setTab('brand')}>Logo et mentions</button><button className={'m-only' + (tab === 'preview' ? ' on' : '')} onClick={() => setTab('preview')}>Aperçu</button></div>
+        {editTab === 'brand' && (
           <div className="brand-ed">
             <section>
               <h3>En-tête</h3>
@@ -212,17 +249,21 @@ export default function App() {
             </section>
             <section>
               <h3>Mention légale</h3>
-              <div className="grid"><label className="wide">Texte<textarea rows="6" value={brand.disclaimer} onChange={(e) => setB('disclaimer', e.target.value)} /></label></div>
+              <div className="grid">
+                <label className="wide">Texte (fiche EN)<textarea rows="5" value={brand.disclaimerEn} onChange={(e) => setB('disclaimerEn', e.target.value)} /></label>
+                <label className="wide">Texte (fiche FR)<textarea rows="5" value={brand.disclaimerFr} onChange={(e) => setB('disclaimerFr', e.target.value)} /></label>
+              </div>
             </section>
             <button className="quiet" onClick={() => setBrand(DEFAULT_BRAND)}>Restaurer les valeurs par défaut</button>
           </div>
         )}
-        <div style={{ display: tab === 'product' ? 'contents' : 'none' }}>
+        <div style={{ display: editTab === 'product' ? 'contents' : 'none' }}>
         <header className="ed-head">
           <input className="name" value={p.name} onChange={(e) => setMeta('name', e.target.value)} aria-label="Nom du produit" />
           <div className="ed-btns">
             <button onClick={duplicate}>Dupliquer</button>
             <button className="danger" onClick={remove} disabled={products.length === 1}>Supprimer</button>
+            <div className="lang-sw" role="group" aria-label="Langue de la fiche">{LANGS.map((l) => <button key={l.code} className={lang === l.code ? 'on' : ''} onClick={() => setLang(l.code)}>{l.label}</button>)}</div>
             <button className="primary" onClick={exportOne} disabled={!!busy}>{busy || 'Télécharger le PDF'}</button>
           </div>
         </header>
@@ -245,11 +286,11 @@ export default function App() {
           <div className="grid">
             {SPEC_FIELDS.filter((f) => !f.aluOnly || lam).map((f) =>
               f.dual ? (
-                <label key={f.key} className="wide dual">{f.label}
+                <label key={f.key} className="wide dual">{specLabel(lang, f.key)}
                   <span><input value={p.specs[f.key]?.[0] ?? ''} placeholder="230 V" onChange={(e) => setSpec(f.key, e.target.value, 0)} /><input value={p.specs[f.key]?.[1] ?? ''} placeholder="240 V" onChange={(e) => setSpec(f.key, e.target.value, 1)} /></span>
                 </label>
               ) : (
-                <label key={f.key}>{f.label}<input value={p.specs[f.key] ?? ''} onChange={(e) => setSpec(f.key, e.target.value)} /></label>
+                <label key={f.key}>{specLabel(lang, f.key)}<input value={p.specs[f.key] ?? ''} onChange={(e) => setSpec(f.key, e.target.value)} /></label>
               )
             )}
           </div>
@@ -268,12 +309,52 @@ export default function App() {
 
         <section>
           <h3>Courbe de température</h3>
-          <ImageField value={p.curveImage} label="Charger la courbe (PNG / JPG)" empty="Aucune courbe chargée : la fiche affiche un cadre « Courbe de température à charger »." onFile={onImage('curveImage', 'Courbe chargée')} onClear={() => setMeta('curveImage', '')} />
+          <div className="radios" role="radiogroup" aria-label="Mode de la courbe">
+            {[['none', 'Aucune'], ['image', 'Image chargée'], ['generated', 'Générée depuis les points']].map(([v, l]) => (
+              <label key={v}><input type="radio" name="curveMode" value={v} checked={(p.curveMode || 'none') === v} onChange={() => setMeta('curveMode', v)} />{l}</label>
+            ))}
+          </div>
+          {p.curveMode === 'image' && (
+            <ImageField value={p.curveImage} label="Charger la courbe (PNG / JPG)" empty="Aucune courbe chargée : l'aperçu affiche un cadre « Courbe de température à charger »." onFile={onImage('curveImage', 'Courbe chargée')} onClear={() => setMeta('curveImage', '')} />
+          )}
+          {p.curveMode === 'generated' && (
+            <div className="pts">
+              <table>
+                <thead><tr><th>Temps (min)</th><th>Température (°C)</th><th /></tr></thead>
+                <tbody>
+                  {(p.curvePoints || []).map((pt, i) => (
+                    <tr key={i}>
+                      <td><input type="number" step="any" value={pt.t} onChange={(e) => setPoint(i, 't', e.target.value)} /></td>
+                      <td><input type="number" step="any" value={pt.temp} onChange={(e) => setPoint(i, 'temp', e.target.value)} /></td>
+                      <td><button type="button" className="x" title="Supprimer ce point" onClick={() => delPoint(i)}>×</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="row2"><button type="button" onClick={addPoint}>+ Ajouter un point</button></div>
+              <div className="grid">
+                <label>Axe X max (min)<input type="number" step="any" value={p.curveAxis?.tMax ?? ''} placeholder="auto" onChange={(e) => setAxis('tMax', e.target.value)} /></label>
+                <label>Axe Y max (°C)<input type="number" step="any" value={p.curveAxis?.tempMax ?? ''} placeholder="auto" onChange={(e) => setAxis('tempMax', e.target.value)} /></label>
+              </div>
+              <p className="hint">Prérempli par l'import Excel (onglet Courbes). Bornes vides = automatiques. Au moins deux points pour tracer la courbe.</p>
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h3>Page 2</h3>
+          <label className="check"><input type="checkbox" checked={!!p.page2Enabled} onChange={(e) => setMeta('page2Enabled', e.target.checked)} />Ajouter une page 2 (applications, intégration, conformité)</label>
+          {p.page2Enabled && (
+            <div className="grid">
+              {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows="4" value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
+              <p className="hint wide" style={{ margin: 0 }}>Une ligne par point (retour à la ligne). Les sections vides n'apparaissent pas sur la page 2.</p>
+            </div>
+          )}
         </section>
         </div>
       </main>
 
-      <div className="preview-wrap"><div className="preview-scale"><Preview product={p} brand={brand} /></div></div>
+      <div className={'preview-wrap' + (tab === 'preview' ? ' on' : '')}><div className="preview-scale"><Preview product={p} brand={brand} lang={lang} /></div></div>
       {toast && <div className="toast">{toast}</div>}
     </div>
   )

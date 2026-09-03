@@ -1,7 +1,9 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer'
-import { SPEC_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
+import { Document, Page, Text, View, StyleSheet, Font, Image, Svg, Path, Line, Circle, G, Text as SvgText } from '@react-pdf/renderer'
+import { SPEC_FIELDS, PAGE2_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
 import { NAVY, TEAL } from './drawing'
+import { t, specLabel, disclaimerOf } from './i18n'
+import { computeCurve, hasCurveData } from './curve'
 
 Font.register({
   family: 'Inter',
@@ -48,11 +50,15 @@ const s = StyleSheet.create({
   footer: { position: 'absolute', left: 40, right: 40, bottom: 30, borderTopWidth: 0.75, borderTopColor: LINE, paddingTop: 7, flexDirection: 'row', justifyContent: 'space-between' },
   fa: { fontSize: 6.5, color: GREY },
   fs: { fontSize: 7, fontWeight: 700, letterSpacing: 1.5 },
+  // page 2
+  p2Body: { marginTop: 16 },
+  p2Sec: { marginBottom: 14 },
+  p2Text: { fontSize: 8.6, lineHeight: 1.5, marginTop: 2 },
 })
 
-const V = ({ v }) => {
+const V = ({ v, na }) => {
   const empty = !v || !String(v).trim()
-  return <Text style={[s.val, empty && s.miss]}>{empty ? 'N/A' : v}</Text>
+  return <Text style={[s.val, empty && s.miss]}>{empty ? na : v}</Text>
 }
 
 // Image du produit dans son cadre, ou cadre pointillé vide si elle est absente.
@@ -62,69 +68,122 @@ function Figure({ src, maxH }) {
   return <View style={s.box}><Image src={src} style={[s.fig, { maxHeight: maxH }]} /></View>
 }
 
+// Courbe générée (src/curve.js) avec les composants SVG de react-pdf.
+function CurvePdf({ p, T }) {
+  const { prims, viewW, viewH } = computeCurve(p.curvePoints, p.curveAxis, { x: T.curveX, y: T.curveY })
+  return (
+    <Svg viewBox={`0 0 ${viewW} ${viewH}`} style={{ width: '100%' }}>
+      {prims.map((q, i) => {
+        if (q.t === 'line') return <Line key={i} x1={q.x1} y1={q.y1} x2={q.x2} y2={q.y2} stroke={q.stroke} strokeWidth={q.sw} />
+        if (q.t === 'path') return <Path key={i} d={q.d} fill="none" stroke={q.stroke} strokeWidth={q.sw} strokeLinejoin="round" strokeLinecap="round" />
+        if (q.t === 'circle') return <Circle key={i} cx={q.cx} cy={q.cy} r={q.r} fill={q.fill} />
+        const txt = <SvgText key={i} x={q.rotate ? 0 : q.x} y={q.rotate ? 0 : q.y} fill={q.fill} textAnchor={q.anchor} style={{ fontSize: q.size, fontWeight: q.weight, fontFamily: 'Inter' }}>{q.s}</SvgText>
+        return q.rotate ? <G key={i} transform={`translate(${q.x},${q.y}) rotate(${q.rotate})`}>{txt}</G> : txt
+      })}
+    </Svg>
+  )
+}
+
+// Section courbe du PDF : image ou SVG ; rien du tout (ni titre ni cadre) en mode « Aucune » ou sans données.
+const curveContent = (p) =>
+  p.curveMode === 'image' && p.curveImage ? 'image'
+  : p.curveMode === 'generated' && hasCurveData(p) ? 'svg'
+  : null
+
+// En-tête commun aux deux pages (titre / société / date, logo + nom du produit, sous-titre + barre teale).
+function Header({ p, brand, T, namePt }) {
+  return (
+    <>
+      <View style={s.top}>
+        <View style={s.hdLeft}>
+          <Text style={s.hdTitle}>{T.title}</Text>
+          <Text style={s.hdLine}>{brand.headerCompany}</Text>
+          <Text style={s.hdLine}>{p.date}</Text>
+        </View>
+        <View style={s.hdRight}>
+          {brand.logo ? (
+            <Image src={brand.logo} style={{ height: brand.logoHeight * 0.75, objectFit: 'contain', objectPosition: 'right' }} />
+          ) : (
+            <View style={s.logo}>
+              <View style={s.g}><Text style={s.gText}>G</Text></View>
+              <View><Text style={s.brand}>{brand.company}</Text><Text style={s.brandSub}>{brand.companySub}</Text></View>
+            </View>
+          )}
+          <Text style={[s.hdProduct, { fontSize: namePt }]}>ABF<Text style={[s.sup, { fontSize: namePt * 0.35 }]}>®</Text> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</Text>
+        </View>
+      </View>
+      <Text style={s.subtitle}>{p.subtitle}</Text>
+    </>
+  )
+}
+
+const Footer = ({ brand }) => (
+  <View style={s.footer} fixed>
+    <Text style={s.fa}>{brand.address}</Text>
+    <Text style={s.fs}>{brand.site}</Text>
+  </View>
+)
+
 // nameSize : taille (px aperçu) du nom du produit calculée par productFontSize() dans le navigateur, pour tenir sur une ligne.
-export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, nameSize = 46 }) {
+export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, lang = 'en', nameSize = 46 }) {
   const lam = isLaminated(p)
+  const T = t(lang)
   const namePt = nameSize * 0.75
-  const figH = p.schemaImage && p.curveImage ? FIG_PT.both : FIG_PT.single
+  const curve = curveContent(p)
+  const figH = p.schemaImage && curve ? FIG_PT.both : FIG_PT.single
+  const page2 = p.page2Enabled ? PAGE2_FIELDS.filter((f) => String(p[f.key] || '').trim()) : []
   return (
     <Document title={`Technical Data Sheet ${p.name}`} author="GRAPHENATON Labs">
       <Page size="A4" style={s.page}>
-        <View style={s.top}>
-          <View style={s.hdLeft}>
-            <Text style={s.hdTitle}>TECHNICAL DATASHEET</Text>
-            <Text style={s.hdLine}>{brand.headerCompany}</Text>
-            <Text style={s.hdLine}>{p.date}</Text>
-          </View>
-          <View style={s.hdRight}>
-            {brand.logo ? (
-              <Image src={brand.logo} style={{ height: brand.logoHeight * 0.75, objectFit: 'contain', objectPosition: 'right' }} />
-            ) : (
-              <View style={s.logo}>
-                <View style={s.g}><Text style={s.gText}>G</Text></View>
-                <View><Text style={s.brand}>{brand.company}</Text><Text style={s.brandSub}>{brand.companySub}</Text></View>
-              </View>
-            )}
-            <Text style={[s.hdProduct, { fontSize: namePt }]}>ABF<Text style={[s.sup, { fontSize: namePt * 0.35 }]}>®</Text> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</Text>
-          </View>
-        </View>
-
-        <Text style={s.subtitle}>{p.subtitle}</Text>
+        <Header p={p} brand={brand} T={T} namePt={namePt} />
 
         <View style={s.cols}>
           <View style={s.left}>
-            <Text style={s.h2}>ELECTRIC AND THERMAL SPECIFICATIONS</Text>
+            <Text style={s.h2}>{T.specsTitle}</Text>
             <View style={s.table}>
               {SPEC_FIELDS.filter((f) => !f.aluOnly || lam).map((f) => (
                 <View key={f.key} style={s.row} wrap={false}>
                   <View style={s.lbl}>
-                    <Text>{f.label}</Text>
-                    {f.dual && <Text style={s.sub}>230 V{'\n'}240 V</Text>}
-                    {f.sub && <Text style={s.sub}>{f.sub}</Text>}
+                    <Text>{specLabel(lang, f.key)}</Text>
+                    {f.dual && <Text style={s.sub}>{T.v230}{'\n'}{T.v240}</Text>}
+                    {f.sub && <Text style={s.sub}>{T.subs[f.key]}</Text>}
                   </View>
                   {f.dual ? (
-                    <View><V v={p.specs[f.key]?.[0]} /><V v={p.specs[f.key]?.[1]} /></View>
+                    <View><V v={p.specs[f.key]?.[0]} na={T.na} /><V v={p.specs[f.key]?.[1]} na={T.na} /></View>
                   ) : (
-                    <V v={p.specs[f.key]} />
+                    <V v={p.specs[f.key]} na={T.na} />
                   )}
                 </View>
               ))}
             </View>
           </View>
           <View style={s.right}>
-            <Text style={s.h2}>DIMENSIONS</Text>
+            <Text style={s.h2}>{T.dimensionsTitle}</Text>
             <Figure src={p.schemaImage} maxH={figH} />
-            <Text style={s.disc}>{brand.disclaimer}</Text>
-            <Text style={[s.h2, s.h2b]}>TEMPERATURE RISE CURVE</Text>
-            <Figure src={p.curveImage} maxH={figH} />
+            <Text style={s.disc}>{disclaimerOf(lang, brand)}</Text>
+            {curve && <Text style={[s.h2, s.h2b]}>{T.curveTitle}</Text>}
+            {curve === 'image' && <Figure src={p.curveImage} maxH={figH} />}
+            {curve === 'svg' && <View style={s.box}><CurvePdf p={p} T={T} /></View>}
           </View>
         </View>
 
-        <View style={s.footer} fixed>
-          <Text style={s.fa}>{brand.address}</Text>
-          <Text style={s.fs}>{brand.site}</Text>
-        </View>
+        <Footer brand={brand} />
       </Page>
+
+      {p.page2Enabled && (
+        <Page size="A4" style={s.page}>
+          <Header p={p} brand={brand} T={T} namePt={namePt} />
+          <View style={s.p2Body}>
+            {page2.map((f) => (
+              <View key={f.key} style={s.p2Sec}>
+                <Text style={s.h2}>{T.page2[f.key]}</Text>
+                <Text style={s.p2Text}>{p[f.key]}</Text>
+              </View>
+            ))}
+          </View>
+          <Footer brand={brand} />
+        </Page>
+      )}
     </Document>
   )
 }

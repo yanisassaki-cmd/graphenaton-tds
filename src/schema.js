@@ -1,27 +1,30 @@
 // Schéma des champs d'une TDS. Chaque champ = une ligne du tableau "Electric and thermal specifications".
 // `dual: true` = deux valeurs (230 V / 240 V). `aluOnly: true` = affiché uniquement pour les versions laminées.
+// `sub: true` = sous-libellé (référence IEC). Les libellés EN / FR sont dans src/i18n.js (specs[key], subs[key]).
+
+import { DISCLAIMER_EN, DISCLAIMER_FR } from './i18n'
 
 export const SPEC_FIELDS = [
-  { key: 'voltage', label: 'Operating Voltage (V)' },
-  { key: 'frequency', label: 'Frequency (Hz)' },
-  { key: 'powerNom', label: 'Nominal Power (W) at 20°C', dual: true },
-  { key: 'currentNom', label: 'Nominal current (A)', dual: true },
-  { key: 'currentPeak', label: 'Current at peak power (A)', dual: true },
-  { key: 'tempAvg', label: 'Average Surface Temperature (°C)' },
-  { key: 'tempMax', label: 'Maximum Surface Temperature (°C)' },
-  { key: 'tempAmbient', label: 'Operating ambient temperature (°C)' },
-  { key: 'heatUp', label: 'Heat-up Time (Seconds)' },
-  { key: 'emissivity', label: 'Radiative / Convective / Conductive emissivity (%)' },
-  { key: 'resistance', label: 'Electrical Resistance at 20°C (Ω)' },
-  { key: 'dielectric', label: 'Dielectric Strength (V)', sub: '(IEC 60335-1 : 2023 + A11 : 2023)' },
-  { key: 'cop', label: 'Coefficient of Performance (COP)' },
-  { key: 'ir', label: 'IR Radiation Distribution' },
-  { key: 'endurance', label: 'Endurance (Electrical resistance variation after 2,500 cycles)' },
-  { key: 'ip', label: 'Ingress Protection' },
-  { key: 'weight', label: 'Weight (g)' },
-  { key: 'thickness', label: 'Thickness of the heating film (mm)' },
-  { key: 'thicknessLam', label: 'Total thickness laminated (mm)', aluOnly: true },
-  { key: 'warranty', label: 'Warranty' },
+  { key: 'voltage' },                     // Operating Voltage (V)
+  { key: 'frequency' },                   // Frequency (Hz)
+  { key: 'powerNom', dual: true },        // Nominal Power (W) at 20°C
+  { key: 'currentNom', dual: true },      // Nominal current (A)
+  { key: 'currentPeak', dual: true },     // Current at peak power (A)
+  { key: 'tempAvg' },                     // Average Surface Temperature (°C)
+  { key: 'tempMax' },                     // Maximum Surface Temperature (°C)
+  { key: 'tempAmbient' },                 // Operating ambient temperature (°C)
+  { key: 'heatUp' },                      // Heat-up Time (Seconds)
+  { key: 'emissivity' },                  // Radiative / Convective / Conductive emissivity (%)
+  { key: 'resistance' },                  // Electrical Resistance at 20°C (Ω)
+  { key: 'dielectric', sub: true },       // Dielectric Strength (V) + (IEC 60335-1 : 2023 + A11 : 2023)
+  { key: 'cop' },                         // Coefficient of Performance (COP)
+  { key: 'ir' },                          // IR Radiation Distribution
+  { key: 'endurance' },                   // Endurance (Electrical resistance variation after 2,500 cycles)
+  { key: 'ip' },                          // Ingress Protection
+  { key: 'weight' },                      // Weight (g)
+  { key: 'thickness' },                   // Thickness of the heating film (mm)
+  { key: 'thicknessLam', aluOnly: true }, // Total thickness laminated (mm)
+  { key: 'warranty' },                    // Warranty
 ]
 
 // Cotes en mm : optionnelles et informatives depuis que le schéma est une image chargée par produit (`schemaImage`).
@@ -36,9 +39,6 @@ export const DIM_FIELDS = [
   { key: 'filmH', label: 'Hauteur du film seul (mm)', aluOnly: true },
 ]
 
-export const DISCLAIMER =
-  'GRAPHENATON reserves the right to make changes without further notice to any products herein. GRAPHENATON makes no warranty, representation or guarantee regarding the suitability of its products for any particular purpose, nor does GRAPHENATON assume any liability arising out of the application or use of any product, and specifically disclaims any and all liability, including without limitation special, consequential or incidental damages.'
-
 export const DEFAULT_BRAND = {
   logo: '',            // data URL (PNG/JPG) chargée depuis l'interface ; vide = logo « G » dessiné
   logoHeight: 90,      // hauteur du logo en px dans l'en-tête (aperçu) ; × 0,75 en pt dans le PDF
@@ -47,7 +47,8 @@ export const DEFAULT_BRAND = {
   companySub: 'LABS SAS',
   address: 'GRAPHENATON Labs — 41 cours de la Liberté, 69003 Lyon – contact@graphenaton.com',
   site: 'WWW.GRAPHENATON.COM',
-  disclaimer: DISCLAIMER,
+  disclaimerEn: DISCLAIMER_EN, // texte légal, fiche en anglais
+  disclaimerFr: DISCLAIMER_FR, // texte légal, fiche en français
 }
 
 // Valeurs par défaut des specs : presets, blankProduct, et produits mémorisés auxquels il manque une clé.
@@ -59,7 +60,28 @@ const defaultSpecs = () => ({
   endurance: '< 5%', ip: '', weight: '', thickness: '', thicknessLam: '', warranty: '10 years',
 })
 
+// Champs additionnels d'un produit (import Excel, courbe) et leurs valeurs par défaut.
+const defaultExtras = () => ({
+  fileRef: '',                          // référence du nom de fichier PDF (Excel « Référence (nom fichier PDF) ») ; vide = nom du produit
+  curveMode: 'none',                    // 'none' (pas de section) | 'image' (curveImage) | 'generated' (curvePoints via curve.js)
+  curvePoints: [],                      // [{ t, temp }] points de la courbe de montée en température (onglet Courbes)
+  curveAxis: { tMax: '', tempMax: '' }, // bornes des axes de la courbe ; vide = automatique
+  page2Enabled: false,                  // seconde page A4 avec les textes ci-dessous (sections vides masquées)
+  applications: '', integration: '', storage: '', compliance: '', testConditions: '', footnotes: '',
+})
+
+// Sections de la page 2, dans l'ordre d'affichage. Libellés de l'éditeur (FR) ; titres de la fiche dans i18n.page2.
+export const PAGE2_FIELDS = [
+  { key: 'applications', label: 'Applications' },
+  { key: 'integration', label: 'Intégration' },
+  { key: 'storage', label: 'Stockage' },
+  { key: 'compliance', label: 'Conformité et réglementation' },
+  { key: 'testConditions', label: 'Conditions de mesure / d\'essai' },
+  { key: 'footnotes', label: 'Notes de bas de page' },
+]
+
 const base = (o) => ({
+  ...defaultExtras(),
   id: o.id,
   name: o.name,
   variant: o.variant, // 'film' | 'alu' | 'plaster'
@@ -71,6 +93,9 @@ const base = (o) => ({
   dims: { outerW: 370, outerH: 673, activeH: 627, tabOffset: 17, tabW: 5, tabGap: 3, filmW: 370, filmH: 673, ...o.dims },
   schemaImage: o.schemaImage ?? '', // data URL (PNG/JPG) du schéma coté ; vide = cadre « Schéma du film à charger »
   curveImage: o.curveImage ?? '',   // data URL (PNG/JPG) de la courbe de montée en température ; vide = cadre « Courbe à charger »
+  fileRef: o.fileRef ?? '',
+  curvePoints: o.curvePoints ?? [],
+  curveAxis: { tMax: '', tempMax: '', ...o.curveAxis },
 })
 
 export const PRESETS = [
@@ -114,7 +139,14 @@ export const blankProduct = () =>
 
 // Complète un produit venant du localStorage ou d'un JSON exporté par une version antérieure :
 // clés images absentes, specs ajoutées depuis (ex. tempAmbient). Une valeur vidée volontairement ('') est conservée.
-export const normalizeProduct = (p) => ({ schemaImage: '', curveImage: '', ...p, specs: { ...defaultSpecs(), ...(p.specs || {}) } })
+export const normalizeProduct = (p) => ({
+  ...defaultExtras(), schemaImage: '', curveImage: '', ...p,
+  specs: { ...defaultSpecs(), ...(p.specs || {}) },
+  curveAxis: { tMax: '', tempMax: '', ...(p.curveAxis || {}) },
+  // produits d'avant le choix de mode : image chargée → 'image', points présents → 'generated', sinon 'none'
+  curveMode: p.curveMode ?? (p.curveImage ? 'image' : (p.curvePoints || []).length >= 2 ? 'generated' : 'none'),
+})
 
 export const isLaminated = (p) => p.variant !== 'film'
-export const slug = (p) => 'TDS_' + p.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.pdf'
+// Nom du fichier PDF : TDS_<nom>_EN.pdf / TDS_<nom>_FR.pdf
+export const slug = (p, lang = 'en') => 'TDS_' + (p.fileRef || p.name).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '_' + lang.toUpperCase() + '.pdf'

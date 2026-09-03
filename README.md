@@ -2,6 +2,8 @@
 
 Interface web pour générer les Technical Data Sheets (PDF A4) des films ABF à partir d'un formulaire, avec aperçu en direct.
 
+Sur ordinateur : trois colonnes (produits, formulaire, aperçu). Sur téléphone (moins de 700 px de large) : sélecteur de produit en haut, formulaire sur une colonne et onglet « Aperçu » qui affiche la fiche à l'échelle de l'écran ; la génération du PDF est identique.
+
 ## Déployer sur Vercel
 
 1. Pousser ce dossier sur un repo GitHub (ou glisser le dossier dans Vercel > Add New Project).
@@ -16,6 +18,11 @@ npm run dev
 ```
 
 ## Fonctionnement
+
+- Fiche bilingue : sélecteur EN / FR dans l'en-tête de l'éditeur. Les valeurs sont partagées, seuls les libellés changent (`src/i18n.js` : specs, titres de sections, en-tête, texte légal EN et FR éditables dans « Logo et mentions »). Le PDF prend le suffixe `_EN` ou `_FR` ; « Télécharger tous les PDF » génère la langue sélectionnée.
+- « Importer un Excel » (sidebar) charge la base `Base_TDS_GRAPHENATON` : onglet « Produits » (ligne « CHAMP », un produit par colonne, un champ par ligne) et onglet « Courbes » (points temps / température et bornes des axes). Le mapping libellé Excel → clé de l'app est l'objet `FIELD_MAP` de `src/excelImport.js` ; les cellules « À COMPLÉTER » deviennent vides ; les libellés non reconnus sont listés dans la console.
+- Page 2 optionnelle par produit (case « Ajouter une page 2 ») : applications, intégration, stockage, conformité, conditions d'essai, notes. Sections vides masquées, même en-tête et pied de page.
+- Courbe de température : « Aucune » (pas de section), « Image chargée » ou « Générée depuis les points » (tableau temps / température + bornes, tracé SVG partagé aperçu / PDF dans `src/curve.js`).
 
 - Les 5 produits de la base (ABF400 film/alu, ABF800 film/alu, ABF80 plâtre) sont préchargés depuis `src/schema.js`.
 - Les modifications sont sauvegardées dans le navigateur (localStorage). « Exporter la base » télécharge un JSON à partager avec un collègue, « Importer » le recharge.
