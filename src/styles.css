@@ -87,3 +87,16 @@ section h3{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.8px;
 .sheet .disc{font-size:8.6px;color:var(--muted);line-height:1.45;text-align:justify;margin-top:12px}
 .sheet-footer{margin-top:auto;border-top:1px solid var(--line);padding:10px 0 14mm;display:flex;justify-content:space-between;font-size:8.5px;color:var(--grey)}
 .sheet-footer b{color:var(--navy);letter-spacing:2px;font-size:9px}
+
+/* image fields (editor: schéma, courbe) */
+.img-field{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.img-field img{display:block;max-width:100%;max-height:160px;object-fit:contain;object-position:left;border:1px solid var(--line);border-radius:6px;background:#fff}
+.img-field .hint{margin:0}
+.img-field .row2{display:flex;gap:8px}
+.img-field .row2 button{padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+.img-field .row2 button:hover{border-color:var(--navy)}
+
+/* sheet figures: product images or dashed "à charger" placeholders */
+.sheet .box img{display:block;width:100%;object-fit:contain}
+.sheet .box.ph{border:1.5px dashed #B8BEC8;background:#fff;height:160px;display:grid;place-items:center;color:var(--muted);font-size:10px;letter-spacing:.3px}
+.sheet h2.mt{margin-top:16px}

@@ -23,6 +23,7 @@ export const SPEC_FIELDS = [
   { key: 'warranty', label: 'Warranty' },
 ]
 
+// Cotes en mm : optionnelles et informatives depuis que le schéma est une image chargée par produit (`schemaImage`).
 export const DIM_FIELDS = [
   { key: 'outerW', label: 'Largeur totale (mm)' },
   { key: 'outerH', label: 'Hauteur totale (mm)' },
@@ -64,6 +65,8 @@ const base = (o) => ({
     ...o.specs,
   },
   dims: { outerW: 370, outerH: 673, activeH: 627, tabOffset: 17, tabW: 5, tabGap: 3, filmW: 370, filmH: 673, ...o.dims },
+  schemaImage: o.schemaImage ?? '', // data URL (PNG/JPG) du schéma coté ; vide = cadre « Schéma du film à charger »
+  curveImage: o.curveImage ?? '',   // data URL (PNG/JPG) de la courbe de montée en température ; vide = cadre « Courbe à charger »
 })
 
 export const PRESETS = [
@@ -104,6 +107,9 @@ export const PRESETS = [
 
 export const blankProduct = () =>
   base({ id: 'new-' + Date.now(), name: 'Nouveau produit', variant: 'film', productNumber: '000', subtitle: '', date: '', specs: {}, dims: {} })
+
+// Complète un produit venant du localStorage ou d'un JSON exporté par une version antérieure (clés images absentes).
+export const normalizeProduct = (p) => ({ schemaImage: '', curveImage: '', ...p })
 
 export const isLaminated = (p) => p.variant !== 'film'
 export const slug = (p) => 'TDS_' + p.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') + '.pdf'

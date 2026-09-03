@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
-import { PRESETS, SPEC_FIELDS, DIM_FIELDS, DEFAULT_BRAND, blankProduct, isLaminated, slug } from './schema'
+import { PRESETS, SPEC_FIELDS, DIM_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
 import Preview from './Preview'
 import TdsPdf from './TdsPdf'
 
 const STORAGE_KEY = 'graphenaton-tds-v1'
 const BRAND_KEY = 'graphenaton-tds-brand-v1'
+const QUOTA_MSG = 'Stockage du navigateur plein : les dernières modifications ne seront pas mémorisées au rechargement. Retirez une image ou exportez la base en JSON pour la conserver.'
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr }
+    if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr.map(normalizeProduct) }
   } catch {}
   return PRESETS
 }
@@ -29,6 +30,42 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
+// Redimensionne une image PNG/JPG via canvas (maxW px de large max) et l'encode en JPEG sur fond blanc
+// (le JPEG n'a pas de transparence) pour rester légère dans le localStorage.
+function resizeImage(file, maxW = 1400, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const k = Math.min(1, maxW / img.naturalWidth)
+      const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k))
+      const c = document.createElement('canvas'); c.width = w; c.height = h
+      const ctx = c.getContext('2d')
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h)
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(c.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')) }
+    img.src = url
+  })
+}
+
+// Vignette + boutons « Charger » / « Retirer » pour une image du produit (schéma, courbe).
+function ImageField({ value, label, empty, onFile, onClear }) {
+  const ref = useRef()
+  return (
+    <div className="img-field">
+      {value ? <img src={value} alt="" /> : <span className="hint">{empty}</span>}
+      <div className="row2">
+        <button type="button" onClick={() => ref.current.click()}>{label}</button>
+        {value && <button type="button" onClick={onClear}>Retirer</button>}
+      </div>
+      <input ref={ref} type="file" accept="image/png,image/jpeg" hidden onChange={onFile} />
+    </div>
+  )
+}
+
 export default function App() {
   const [products, setProducts] = useState(load)
   const [sel, setSel] = useState(0)
@@ -38,7 +75,8 @@ export default function App() {
   const [toast, setToast] = useState('')
   const fileRef = useRef()
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)) }, [products])
+  // Les images (data URL) peuvent dépasser le quota du localStorage : on prévient sans planter.
+  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)) } catch { setToast(QUOTA_MSG) } }, [products])
   useEffect(() => { try { localStorage.setItem(BRAND_KEY, JSON.stringify(brand)) } catch { setToast('Logo trop lourd pour être mémorisé (max ~2 Mo)') } }, [brand])
   const setB = (k, v) => setBrand((b) => ({ ...b, [k]: v }))
   const onLogo = (e) => {
@@ -46,7 +84,7 @@ export default function App() {
     if (!/image\/(png|jpeg)/.test(f.type)) { setToast('Logo : PNG ou JPG uniquement (le SVG n\'est pas supporté dans le PDF)'); return }
     const r = new FileReader(); r.onload = () => setB('logo', r.result); r.readAsDataURL(f); e.target.value = ''
   }
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 2500); return () => clearTimeout(t) }, [toast])
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), toast.length > 80 ? 7000 : 2500); return () => clearTimeout(t) }, [toast])
 
   const p = products[Math.min(sel, products.length - 1)]
   const lam = isLaminated(p)
@@ -56,6 +94,13 @@ export default function App() {
   const setSpec = (k, v, idx) => update((x) => { if (idx == null) x.specs[k] = v; else { const a = Array.isArray(x.specs[k]) ? x.specs[k] : ['', '']; a[idx] = v; x.specs[k] = a } return x })
   const setDim = (k, v) => update((x) => { x.dims[k] = v; return x })
 
+  // Upload d'une image produit (schemaImage / curveImage) : redimensionnée puis stockée dans l'objet produit.
+  const onImage = (key, done) => async (e) => {
+    const f = e.target.files?.[0]; e.target.value = ''; if (!f) return
+    if (!/^image\/(png|jpeg)$/.test(f.type)) { setToast('PNG ou JPG uniquement (le SVG n\'est pas supporté dans le PDF)'); return }
+    try { setMeta(key, await resizeImage(f)); setToast(done) } catch (err) { console.error(err); setToast('Image illisible') }
+  }
+
   const addProduct = () => { setProducts((a) => [...a, blankProduct()]); setSel(products.length) }
   const duplicate = () => { const c = clone(p); c.id = 'copy-' + Date.now(); c.name = p.name + ' (copie)'; setProducts((a) => [...a, c]); setSel(products.length); setToast('Produit dupliqué') }
   const remove = () => { if (!confirm(`Supprimer « ${p.name} » ?`)) return; setProducts((a) => a.filter((_, i) => i !== sel)); setSel(0); setToast('Produit supprimé') }
@@ -64,7 +109,7 @@ export default function App() {
   const exportJson = () => download(new Blob([JSON.stringify(products, null, 2)], { type: 'application/json' }), 'base_tds_graphenaton.json')
   const importJson = (e) => {
     const f = e.target.files?.[0]; if (!f) return
-    f.text().then((t) => { const arr = JSON.parse(t); if (!Array.isArray(arr)) throw 0; setProducts(arr); setSel(0); setToast(`${arr.length} produits importés`) })
+    f.text().then((t) => { const arr = JSON.parse(t); if (!Array.isArray(arr)) throw 0; setProducts(arr.map(normalizeProduct)); setSel(0); setToast(`${arr.length} produits importés`) })
       .catch(() => setToast('Fichier invalide : JSON exporté depuis cet outil attendu'))
     e.target.value = ''
   }
@@ -87,6 +132,7 @@ export default function App() {
   const missing = useMemo(() => {
     const m = []
     if (!p.date) m.push('date'); if (!p.subtitle) m.push('sous-titre')
+    if (!p.schemaImage) m.push('schéma'); if (!p.curveImage) m.push('courbe')
     SPEC_FIELDS.filter((f) => !f.aluOnly || lam).forEach((f) => {
       const v = p.specs[f.key]
       if (f.dual ? !(v?.[0] && v?.[1]) : !v) m.push(f.label)
@@ -167,7 +213,7 @@ export default function App() {
           </div>
         </header>
 
-        {missing.length > 0 && <div className="warn">{missing.length} champ{missing.length > 1 ? 's' : ''} vide{missing.length > 1 ? 's' : ''} : {missing.slice(0, 4).join(', ')}{missing.length > 4 ? '…' : ''}. Ils sortiront en « N/A » rouge sur le PDF.</div>}
+        {missing.length > 0 && <div className="warn">{missing.length} champ{missing.length > 1 ? 's' : ''} vide{missing.length > 1 ? 's' : ''} : {missing.slice(0, 4).join(', ')}{missing.length > 4 ? '…' : ''}. Ils sortiront en « N/A » rouge sur le PDF (cadre vide pour le schéma et la courbe).</div>}
 
         <section>
           <h3>Document</h3>
@@ -196,12 +242,19 @@ export default function App() {
         </section>
 
         <section>
-          <h3>Dimensions du schéma (mm)</h3>
+          <h3>Dimensions du schéma</h3>
+          <ImageField value={p.schemaImage} label="Charger le schéma (PNG / JPG)" empty="Aucun schéma chargé : la fiche affiche un cadre « Schéma du film à charger »." onFile={onImage('schemaImage', 'Schéma chargé')} onClear={() => setMeta('schemaImage', '')} />
+          <p className="hint" style={{ margin: '0 0 10px' }}>Cotes en mm, optionnelles : mémorisées avec le produit, non dessinées sur la fiche.</p>
           <div className="grid">
             {DIM_FIELDS.filter((f) => !f.aluOnly || lam).map((f) => (
-              <label key={f.key}>{f.label}<input type="number" step="0.1" value={p.dims[f.key] ?? ''} onChange={(e) => setDim(f.key, e.target.value)} /></label>
+              <label key={f.key}>{f.label}<input type="number" step="0.1" value={p.dims[f.key] ?? ''} placeholder="optionnel" onChange={(e) => setDim(f.key, e.target.value)} /></label>
             ))}
           </div>
+        </section>
+
+        <section>
+          <h3>Courbe de température</h3>
+          <ImageField value={p.curveImage} label="Charger la courbe (PNG / JPG)" empty="Aucune courbe chargée : la fiche affiche un cadre « Courbe de température à charger »." onFile={onImage('curveImage', 'Courbe chargée')} onClear={() => setMeta('curveImage', '')} />
         </section>
         </div>
       </main>

@@ -1,29 +1,24 @@
 import React from 'react'
 import { SPEC_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
-import { computeDrawing } from './drawing'
+
+// Hauteurs max des images (px écran) : miroir des valeurs en pt de TdsPdf.jsx (× 1,333) pour que l'aperçu
+// reflète la mise en page du PDF. Le schéma coté généré (src/drawing.js) n'est plus utilisé par défaut.
+const FIG_PX = { both: 253, single: 347 }
 
 function Val({ v }) {
   const empty = !v || !String(v).trim()
   return <b className={empty ? 'miss' : ''}>{empty ? 'N/A' : v}</b>
 }
 
-function Drawing({ dims, laminated }) {
-  const { prims, viewW, viewH } = computeDrawing(dims, laminated)
-  return (
-    <svg viewBox={`0 0 ${viewW} ${viewH}`} width="100%" xmlns="http://www.w3.org/2000/svg">
-      {prims.map((p, i) => {
-        if (p.t === 'rect') return <rect key={i} x={p.x} y={p.y} width={p.width} height={p.height} fill={p.fill} stroke={p.stroke} strokeWidth={p.sw} />
-        if (p.t === 'line') return <line key={i} x1={p.x1} y1={p.y1} x2={p.x2} y2={p.y2} stroke={p.stroke} strokeWidth={1} />
-        return (
-          <text key={i} transform={`translate(${p.x},${p.y}) rotate(${p.rotate})`} fontSize={p.size} fontWeight={p.weight} fill={p.fill} textAnchor={p.anchor} fontFamily="Inter, Arial, sans-serif">{p.s}</text>
-        )
-      })}
-    </svg>
-  )
+// Image du produit dans son cadre, ou cadre pointillé « à charger » si elle est absente.
+function Figure({ src, placeholder, maxH }) {
+  if (!src) return <div className="box ph">{placeholder}</div>
+  return <div className="box"><img src={src} alt="" style={{ maxHeight: maxH }} /></div>
 }
 
 export default function Preview({ product: p, brand = DEFAULT_BRAND }) {
   const lam = isLaminated(p)
+  const figH = p.schemaImage && p.curveImage ? FIG_PX.both : FIG_PX.single
   return (
     <div className="sheet">
       <div className="sheet-top">
@@ -55,8 +50,10 @@ export default function Preview({ product: p, brand = DEFAULT_BRAND }) {
         </div>
         <div className="right">
           <h2>DIMENSIONS</h2>
-          <div className="box"><Drawing dims={p.dims} laminated={lam} /></div>
+          <Figure src={p.schemaImage} placeholder="Schéma du film à charger" maxH={figH} />
           <div className="disc">{brand.disclaimer}</div>
+          <h2 className="mt">TEMPERATURE RISE CURVE</h2>
+          <Figure src={p.curveImage} placeholder="Courbe de température à charger" maxH={figH} />
         </div>
       </div>
       <div className="sheet-footer"><span>{brand.address}</span><b>{brand.site}</b></div>
