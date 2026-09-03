@@ -16,19 +16,20 @@ const FIG_PT = { both: 190, single: 260, placeholder: 120 }
 const GREY = '#5B6270', LINE = '#D9DDE3', MUTED = '#8A8F99'
 const s = StyleSheet.create({
   page: { fontFamily: 'Inter', color: NAVY, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40, fontSize: 8.5 },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  // En-tête deux colonnes : tailles en pt = tailles px de l'aperçu (.sheet) × 0,75
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 15 },
+  hdLeft: { flexShrink: 0, paddingTop: 6 },
+  hdTitle: { fontSize: 22, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.2 },
+  hdLine: { fontSize: 18, color: GREY, lineHeight: 1.25, marginTop: 3 },
+  hdRight: { flex: 1, alignItems: 'flex-end' },
+  hdProduct: { fontWeight: 800, letterSpacing: -0.8, lineHeight: 1.05, marginTop: 6, textAlign: 'right' }, // fontSize : nameSize × 0,75
   logo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   g: { width: 34, height: 34, borderWidth: 2.5, borderColor: NAVY, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   gText: { fontSize: 18, fontWeight: 800 },
   brand: { fontSize: 13, fontWeight: 700, letterSpacing: 1.5 },
   brandSub: { fontSize: 6, letterSpacing: 2.5, color: GREY, marginTop: 1 },
-  tr: { alignItems: 'flex-end' },
-  trB: { fontSize: 7.5, fontWeight: 700 },
-  trS: { fontSize: 7, color: GREY, marginTop: 2 },
-  kicker: { marginTop: 30, color: TEAL, fontSize: 7.5, fontWeight: 700, letterSpacing: 3 },
-  h1: { fontSize: 32, fontWeight: 800, marginTop: 4, letterSpacing: -0.8 },
-  sup: { fontSize: 10, fontWeight: 800 },
-  subtitle: { fontSize: 10.5, color: GREY, marginTop: 2, paddingBottom: 12, borderBottomWidth: 2.5, borderBottomColor: TEAL },
+  sup: { fontWeight: 800 },
+  subtitle: { fontSize: 10.5, color: GREY, marginTop: 10, paddingBottom: 12, borderBottomWidth: 2.5, borderBottomColor: TEAL },
   cols: { flexDirection: 'row', gap: 20, marginTop: 16 },
   left: { width: '56%' },
   right: { flex: 1 },
@@ -61,26 +62,33 @@ function Figure({ src, maxH }) {
   return <View style={s.box}><Image src={src} style={[s.fig, { maxHeight: maxH }]} /></View>
 }
 
-export default function TdsPdf({ product: p, brand = DEFAULT_BRAND }) {
+// nameSize : taille (px aperçu) du nom du produit calculée par productFontSize() dans le navigateur, pour tenir sur une ligne.
+export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, nameSize = 46 }) {
   const lam = isLaminated(p)
+  const namePt = nameSize * 0.75
   const figH = p.schemaImage && p.curveImage ? FIG_PT.both : FIG_PT.single
   return (
     <Document title={`Technical Data Sheet ${p.name}`} author="GRAPHENATON Labs">
       <Page size="A4" style={s.page}>
         <View style={s.top}>
-          {brand.logo ? (
-            <Image src={brand.logo} style={{ height: brand.logoHeight * 0.75, objectFit: 'contain', objectPosition: 'left' }} />
-          ) : (
-            <View style={s.logo}>
-              <View style={s.g}><Text style={s.gText}>G</Text></View>
-              <View><Text style={s.brand}>{brand.company}</Text><Text style={s.brandSub}>{brand.companySub}</Text></View>
-            </View>
-          )}
-          <View style={s.tr}><Text style={s.trB}>TECHNICAL DATA SHEET</Text><Text style={s.trS}>GRAPHENATON Labs – {p.date}</Text></View>
+          <View style={s.hdLeft}>
+            <Text style={s.hdTitle}>TECHNICAL DATASHEET</Text>
+            <Text style={s.hdLine}>{brand.headerCompany}</Text>
+            <Text style={s.hdLine}>{p.date}</Text>
+          </View>
+          <View style={s.hdRight}>
+            {brand.logo ? (
+              <Image src={brand.logo} style={{ height: brand.logoHeight * 0.75, objectFit: 'contain', objectPosition: 'right' }} />
+            ) : (
+              <View style={s.logo}>
+                <View style={s.g}><Text style={s.gText}>G</Text></View>
+                <View><Text style={s.brand}>{brand.company}</Text><Text style={s.brandSub}>{brand.companySub}</Text></View>
+              </View>
+            )}
+            <Text style={[s.hdProduct, { fontSize: namePt }]}>ABF<Text style={[s.sup, { fontSize: namePt * 0.35 }]}>®</Text> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</Text>
+          </View>
         </View>
 
-        <Text style={s.kicker}>TECHNICAL DATA SHEET</Text>
-        <Text style={s.h1}>ABF<Text style={s.sup}>®</Text> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</Text>
         <Text style={s.subtitle}>{p.subtitle}</Text>
 
         <View style={s.cols}>

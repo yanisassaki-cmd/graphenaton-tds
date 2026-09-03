@@ -26,7 +26,7 @@ npm run dev
 
 ## Logo, pied de page, mention légale
 
-Onglet « Logo et mentions » dans l'éditeur : charger un PNG ou JPG (fond transparent conseillé, ~800 px de large), régler la hauteur, éditer l'adresse, le site et le texte légal. Tout est mémorisé dans le navigateur et appliqué à l'aperçu et aux PDF. Sans logo chargé, le bloc « G GRAPHENATON LABS SAS » est dessiné en vectoriel.
+Onglet « Logo et mentions » dans l'éditeur : nom de la société affiché dans l'en-tête (sous « TECHNICAL DATASHEET »), charger un PNG ou JPG (fond transparent conseillé, ~800 px de large, affiché en haut à droite au-dessus du nom du produit), régler la hauteur, éditer l'adresse, le site et le texte légal. Tout est mémorisé dans le navigateur et appliqué à l'aperçu et aux PDF. Sans logo chargé, le bloc « G GRAPHENATON LABS SAS » est dessiné en vectoriel.
 
 Pour un logo par défaut intégré au déploiement : placer `logo.png` dans `public/` et mettre `logo: '/logo.png'` dans `DEFAULT_BRAND` (`src/schema.js`).
 

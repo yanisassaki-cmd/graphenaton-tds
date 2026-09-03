@@ -40,7 +40,8 @@ export const DISCLAIMER =
 
 export const DEFAULT_BRAND = {
   logo: '',            // data URL (PNG/JPG) chargée depuis l'interface ; vide = logo « G » dessiné
-  logoHeight: 44,      // hauteur du logo en px dans l'en-tête
+  logoHeight: 90,      // hauteur du logo en px dans l'en-tête (aperçu) ; × 0,75 en pt dans le PDF
+  headerCompany: 'GRAPHENATON Technologies SA', // ligne sous « TECHNICAL DATASHEET » dans l'en-tête
   company: 'GRAPHENATON',
   companySub: 'LABS SAS',
   address: 'GRAPHENATON Labs — 41 cours de la Liberté, 69003 Lyon – contact@graphenaton.com',

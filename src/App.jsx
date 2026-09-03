@@ -3,6 +3,7 @@ import { pdf } from '@react-pdf/renderer'
 import { PRESETS, SPEC_FIELDS, DIM_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
 import Preview from './Preview'
 import TdsPdf from './TdsPdf'
+import { productFontSize } from './header'
 
 const STORAGE_KEY = 'graphenaton-tds-v1'
 const BRAND_KEY = 'graphenaton-tds-brand-v1'
@@ -17,7 +18,14 @@ function load() {
 }
 
 function loadBrand() {
-  try { const raw = localStorage.getItem(BRAND_KEY); if (raw) return { ...DEFAULT_BRAND, ...JSON.parse(raw) } } catch {}
+  try {
+    const raw = localStorage.getItem(BRAND_KEY)
+    if (raw) {
+      const b = JSON.parse(raw)
+      if (b.logoHeight === 44) delete b.logoHeight // ancien défaut de l'en-tête précédent : on reprend le nouveau (90)
+      return { ...DEFAULT_BRAND, ...b }
+    }
+  } catch {}
   return DEFAULT_BRAND
 }
 
@@ -114,7 +122,7 @@ export default function App() {
     e.target.value = ''
   }
 
-  const makePdf = async (prod) => (await pdf(<TdsPdf product={prod} brand={brand} />).toBlob())
+  const makePdf = async (prod) => (await pdf(<TdsPdf product={prod} brand={brand} nameSize={productFontSize(prod, brand)} />).toBlob())
   const exportOne = async () => {
     setBusy('Génération du PDF…')
     try { download(await makePdf(p), slug(p)); setToast('PDF téléchargé') } catch (err) { console.error(err); setToast('Échec de la génération, voir la console') }
@@ -168,6 +176,12 @@ export default function App() {
         {tab === 'brand' && (
           <div className="brand-ed">
             <section>
+              <h3>En-tête</h3>
+              <div className="grid">
+                <label className="wide">Nom de la société dans l'en-tête<input value={brand.headerCompany} onChange={(e) => setB('headerCompany', e.target.value)} /></label>
+              </div>
+            </section>
+            <section>
               <h3>Logo</h3>
               <div className="logo-row">
                 {brand.logo ? <img src={brand.logo} alt="" style={{ height: 48 }} /> : <span className="hint">Aucun logo chargé : le « G » dessiné est utilisé.</span>}
@@ -178,9 +192,9 @@ export default function App() {
                 <input id="logo-file" type="file" accept="image/png,image/jpeg" hidden onChange={onLogo} />
               </div>
               <div className="grid">
-                <label>Hauteur du logo (px)<input type="number" value={brand.logoHeight} onChange={(e) => setB('logoHeight', +e.target.value || 44)} /></label>
+                <label>Hauteur du logo (px)<input type="number" value={brand.logoHeight} onChange={(e) => setB('logoHeight', +e.target.value || 90)} /></label>
               </div>
-              <p className="hint">Conseil : PNG sur fond transparent, largeur 800 px environ. Le logo remplace le bloc « G GRAPHENATON LABS SAS » en haut à gauche.</p>
+              <p className="hint">Conseil : PNG sur fond transparent, largeur 800 px environ. Le logo remplace le bloc « G GRAPHENATON LABS SAS » en haut à droite, au-dessus du nom du produit.</p>
             </section>
             <section>
               <h3>Sans logo : texte de l'en-tête</h3>
