@@ -119,7 +119,7 @@ export default function App() {
 
   const update = (fn) => setProducts((arr) => arr.map((x, i) => (i === sel ? fn(clone(x)) : x)))
   const setMeta = (k, v) => update((x) => { x[k] = v; return x })
-  const setSpec = (k, v, idx) => update((x) => { if (idx == null) x.specs[k] = v; else { const a = Array.isArray(x.specs[k]) ? x.specs[k] : ['', '']; a[idx] = v; x.specs[k] = a } return x })
+  const setSpec = (k, v, idx) => update((x) => { if (idx == null) x.specs[k] = v; else { const a = Array.isArray(x.specs[k]) ? [...x.specs[k]] : []; while (a.length <= idx) a.push(''); a[idx] = v; x.specs[k] = a } return x })
   const setDim = (k, v) => update((x) => { x.dims[k] = v; return x })
   // Courbe générée : points { t, temp } et bornes des axes
   const setPoint = (i, k, v) => update((x) => { x.curvePoints[i][k] = v; return x })
@@ -182,6 +182,7 @@ export default function App() {
     if ((p.curveMode === 'image' && !p.curveImage) || (p.curveMode === 'generated' && !hasCurveData(p))) m.push('courbe')
     SPEC_FIELDS.filter((f) => !f.aluOnly || lam).forEach((f) => {
       const v = p.specs[f.key]
+      if (f.multi) return // paliers de montée en température : optionnels
       if (f.dual ? !(v?.[0] && v?.[1]) : !v) m.push(specLabel(lang, f.key))
     })
     return m
@@ -292,7 +293,11 @@ export default function App() {
           <h3>Electric and thermal specifications</h3>
           <div className="grid">
             {SPEC_FIELDS.filter((f) => !f.aluOnly || lam).map((f) =>
-              f.dual ? (
+              f.multi ? (
+                <label key={f.key} className="wide triple">{specLabel(lang, f.key)} — paliers « cible: durée »
+                  <span>{[0, 1, 2].map((i) => <input key={i} value={p.specs[f.key]?.[i] ?? ''} placeholder={['to 120 °C: < 1 min', 'to 100 °C: < 30 s', 'to 80 °C: < 20 s'][i]} onChange={(e) => setSpec(f.key, e.target.value, i)} />)}</span>
+                </label>
+              ) : f.dual ? (
                 <label key={f.key} className="wide dual">{specLabel(lang, f.key)}
                   <span><input value={p.specs[f.key]?.[0] ?? ''} placeholder="230 V" onChange={(e) => setSpec(f.key, e.target.value, 0)} /><input value={p.specs[f.key]?.[1] ?? ''} placeholder="240 V" onChange={(e) => setSpec(f.key, e.target.value, 1)} /></span>
                 </label>
@@ -349,21 +354,27 @@ export default function App() {
         </section>
 
         <section>
+          <h3>Textes de la fiche (colonne gauche)</h3>
+          <div className="grid">
+            {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows={f.key === 'applications' ? 4 : 3} value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
+            <p className="hint wide" style={{ margin: 0 }}>Intégration et conformité : une ligne par point (liste à tirets). Les sections vides n'apparaissent pas sur la fiche.</p>
+            <h3 className="wide" style={{ margin: '6px 0 0' }}>Spécifications mécaniques</h3>
+            <label>Longueur (mm)<input value={p.mech?.length ?? ''} placeholder={String(p.dims.outerH ?? '')} onChange={(e) => setMech('length', e.target.value)} /></label>
+            <label>Largeur (mm)<input value={p.mech?.width ?? ''} placeholder={String(p.dims.outerW ?? '')} onChange={(e) => setMech('width', e.target.value)} /></label>
+            <label>Surface active (mm)<input value={p.mech?.activeSurface ?? ''} placeholder="620 x 360" onChange={(e) => setMech('activeSurface', e.target.value)} /></label>
+            <label>Construction<input value={p.mech?.construction ?? ''} onChange={(e) => setMech('construction', e.target.value)} /></label>
+            <p className="hint wide" style={{ margin: 0 }}>Épaisseur, poids et garantie sont repris des specs ; longueur et largeur reprennent les cotes du schéma si vides.</p>
+          </div>
+        </section>
+
+        <section>
           <h3>Page 2</h3>
-          <label className="check"><input type="checkbox" checked={!!p.page2Enabled} onChange={(e) => setMeta('page2Enabled', e.target.checked)} />Ajouter une page 2 (applications, intégration, conformité)</label>
+          <label className="check"><input type="checkbox" checked={!!p.page2Enabled} onChange={(e) => setMeta('page2Enabled', e.target.checked)} />Ajouter une page 2 (applications détaillées en cartes)</label>
           {p.page2Enabled && (
             <div className="grid">
-              {p2Over > 6 && <div className="warn wide" style={{ margin: 0 }}>La page 2 déborde d'environ {Math.round(p2Over)} px dans l'aperçu : raccourcissez l'introduction, les notes ou retirez une carte, sinon le PDF passera sur une 3e page.</div>}
+              {p2Over > 6 && <div className="warn wide" style={{ margin: 0 }}>La page 2 déborde d'environ {Math.round(p2Over)} px dans l'aperçu : retirez une carte ou raccourcissez les descriptions.</div>}
               <label className="wide">Applications en cartes : une par ligne, « Titre : description »<textarea rows="9" value={p.applicationList ?? ''} onChange={(e) => setMeta('applicationList', e.target.value)} /></label>
-              <p className="hint wide" style={{ margin: '-4px 0 0' }}>Le pictogramme est choisi d'après le titre : mobilité / véhicule, plafond, sol, mur, siège / mobilier, industriel, dégivrage / extérieur, bien-être / médical ; sinon un point teal.</p>
-              {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows={f.key === 'applications' ? 3 : 4} value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
-              <p className="hint wide" style={{ margin: 0 }}>Intégration et conformité : une ligne par point (affichées avec une coche ; badges CE / RoHS / REACH détectés). Les sections vides n'apparaissent pas.</p>
-              <h3 className="wide" style={{ margin: '6px 0 0' }}>Spécifications mécaniques (page 2)</h3>
-              <label>Longueur (mm)<input value={p.mech?.length ?? ''} placeholder={String(p.dims.outerH ?? '')} onChange={(e) => setMech('length', e.target.value)} /></label>
-              <label>Largeur (mm)<input value={p.mech?.width ?? ''} placeholder={String(p.dims.outerW ?? '')} onChange={(e) => setMech('width', e.target.value)} /></label>
-              <label>Surface active (mm)<input value={p.mech?.activeSurface ?? ''} placeholder="620 x 360" onChange={(e) => setMech('activeSurface', e.target.value)} /></label>
-              <label>Construction<input value={p.mech?.construction ?? ''} onChange={(e) => setMech('construction', e.target.value)} /></label>
-              <p className="hint wide" style={{ margin: 0 }}>Épaisseur et poids sont repris des specs ; longueur et largeur reprennent les cotes du schéma si vides.</p>
+              <p className="hint wide" style={{ margin: '-4px 0 0' }}>Le pictogramme est choisi d'après le titre : mobilité / véhicule, plafond, sol, mur, siège / mobilier, industriel, dégivrage / extérieur, bien-être / médical ; sinon un point teal. Le paragraphe « Applications » de la page 1 sert d'introduction.</p>
             </div>
           )}
         </section>

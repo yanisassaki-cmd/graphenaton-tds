@@ -23,6 +23,8 @@ const en = {
   na: 'N/A',
   curveX: 'Time (min)',
   curveY: 'Temperature (°C)',
+  warrantyTitle: 'WARRANTY',
+  testIntro: 'Unless otherwise specified, the following conditions apply:',
   disclaimerKey: 'disclaimerEn', // clé de `brand` contenant le texte légal dans cette langue
   page2: {
     applications: 'APPLICATIONS',
@@ -34,8 +36,12 @@ const en = {
     mech: 'MECHANICAL SPECIFICATIONS',
   },
   mech: { length: 'Length (mm)', width: 'Width (mm)', activeSurface: 'Active surface (mm)', thickness: 'Film thickness (mm)', thicknessLam: 'Total thickness (mm)', weight: 'Weight (g)', construction: 'Construction' },
+  mechShort: { length: 'Length', width: 'Width', activeSurface: 'Active surface', thickness: 'Thickness', thicknessLam: 'Total thickness laminated', weight: 'Weight', construction: 'Construction' },
   subs: { dielectric: '(IEC 60335-1 : 2023 + A11 : 2023)' },
   specs: {
+    powerPeak: 'Peak power (W) **',
+    warmUp: 'Warm-up time at 230 V',
+    applianceClass: 'Electrical appliance',
     voltage: 'Operating Voltage (V)',
     frequency: 'Frequency (Hz)',
     powerNom: 'Nominal Power (W) at 20°C',
@@ -70,6 +76,8 @@ const fr = {
   na: 'N/A',
   curveX: 'Temps (min)',
   curveY: 'Température (°C)',
+  warrantyTitle: 'GARANTIE',
+  testIntro: 'Sauf indication contraire, les conditions suivantes s\'appliquent :',
   disclaimerKey: 'disclaimerFr',
   page2: {
     applications: 'APPLICATIONS',
@@ -81,8 +89,12 @@ const fr = {
     mech: 'SPÉCIFICATIONS MÉCANIQUES',
   },
   mech: { length: 'Longueur (mm)', width: 'Largeur (mm)', activeSurface: 'Surface active (mm)', thickness: 'Épaisseur du film (mm)', thicknessLam: 'Épaisseur totale (mm)', weight: 'Poids (g)', construction: 'Construction' },
+  mechShort: { length: 'Longueur', width: 'Largeur', activeSurface: 'Surface active', thickness: 'Épaisseur', thicknessLam: 'Épaisseur totale laminée', weight: 'Poids', construction: 'Construction' },
   subs: { dielectric: '(IEC 60335-1 : 2023 + A11 : 2023)' },
   specs: {
+    powerPeak: 'Puissance de crête (W) **',
+    warmUp: 'Temps de montée en température à 230 V',
+    applianceClass: 'Appareil électrique',
     voltage: 'Tension de fonctionnement (V)',
     frequency: 'Fréquence (Hz)',
     powerNom: 'Puissance nominale (W) à 20 °C',
@@ -91,7 +103,7 @@ const fr = {
     tempAvg: 'Température de surface moyenne (°C)',
     tempMax: 'Température de surface maximale (°C)',
     tempAmbient: 'Température ambiante de fonctionnement (°C)',
-    heatUp: 'Temps de montée en température (s)',
+    heatUp: 'Temps de chauffe (s)',
     emissivity: 'Émissivité radiative / convective / conductive (%)',
     resistance: 'Résistance électrique à 20 °C (Ω)',
     dielectric: 'Rigidité diélectrique (V)',

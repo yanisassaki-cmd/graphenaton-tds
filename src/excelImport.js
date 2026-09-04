@@ -20,6 +20,8 @@ export const FIELD_MAP = {
   // Specs électriques et thermiques
   'Operating Voltage (V)': 'specs.voltage',
   'Frequency (Hz)': 'specs.frequency',
+  'Peak Power (W) at 20°C – 230 V': 'specs.powerPeak.0',
+  'Peak Power (W) at 20°C – 240 V': 'specs.powerPeak.1',
   'Nominal Power (W) at 20°C – 230 V': 'specs.powerNom.0',
   'Nominal Power (W) at 20°C – 240 V': 'specs.powerNom.1',
   'Nominal current (A) – 230 V': 'specs.currentNom.0',
@@ -39,6 +41,10 @@ export const FIELD_MAP = {
   'Endurance (variation résistance après 2 500 cycles)': 'specs.endurance',
   'Endurance (Electrical resistance variation after 2,500 cycles)': 'specs.endurance',
   'Ingress Protection': 'specs.ip',
+  'Electrical appliance class': 'specs.applianceClass',
+  'Warm-up time at 230 V – palier 1': 'specs.warmUp.0',
+  'Warm-up time at 230 V – palier 2': 'specs.warmUp.1',
+  'Warm-up time at 230 V – palier 3': 'specs.warmUp.2',
   'Warranty': 'specs.warranty',
   'Conditions de mesure (texte)': 'testConditions',
   // Specs mécaniques (tableau « Mechanical specifications » de la page 2)
@@ -96,7 +102,7 @@ function setPath(obj, path, value) {
   let o = obj
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i], next = keys[i + 1]
-    if (o[k] == null || typeof o[k] !== 'object') o[k] = /^\d+$/.test(next) ? ['', ''] : {}
+    if (o[k] == null || typeof o[k] !== 'object') o[k] = /^\d+$/.test(next) ? [] : {}
     o = o[k]
   }
   o[keys[keys.length - 1]] = value

@@ -23,8 +23,8 @@ const fmt = (v) => String(Number(v.toFixed(2)))
 // points : [{ t, temp }], axis : { tMax, tempMax } (vide = automatique), labels : { x, y } (titres traduits).
 export function computeCurve(points, axis = {}, labels = { x: 'Time (min)', y: 'Temperature (°C)' }) {
   const pts = (points || []).filter(valid).map((p) => ({ t: +p.t, temp: +p.temp })).sort((a, b) => a.t - b.t)
-  const viewW = 400, viewH = 240
-  const ml = 46, mr = 14, mt = 14, mb = 40
+  const viewW = 400, viewH = 200
+  const ml = 46, mr = 14, mt = 12, mb = 38
   const W = viewW - ml - mr, H = viewH - mt - mb
   const maxT = pts.length ? Math.max(...pts.map((p) => p.t)) : 1
   const maxTemp = pts.length ? Math.max(...pts.map((p) => p.temp)) : 1

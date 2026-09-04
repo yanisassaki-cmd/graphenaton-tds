@@ -1,30 +1,35 @@
 // Schéma des champs d'une TDS. Chaque champ = une ligne du tableau "Electric and thermal specifications".
 // `dual: true` = deux valeurs (230 V / 240 V). `aluOnly: true` = affiché uniquement pour les versions laminées.
-// `sub: true` = sous-libellé (référence IEC). Les libellés EN / FR sont dans src/i18n.js (specs[key], subs[key]).
+// `sub: true` = sous-libellé (référence IEC). `multi: 3` = trois paliers « to 120 °C: < 1 min ». `noTable: true` =
+// saisi dans l'éditeur mais affiché hors tableau (liste mécanique / section Warranty de la colonne gauche).
+// Les libellés EN / FR sont dans src/i18n.js (specs[key], subs[key]). Ordre = ordre du tableau de la fiche.
 
 import { DISCLAIMER_EN, DISCLAIMER_FR } from './i18n'
 
 export const SPEC_FIELDS = [
-  { key: 'voltage' },                     // Operating Voltage (V)
-  { key: 'frequency' },                   // Frequency (Hz)
+  { key: 'powerPeak', dual: true },       // Peak power (W) **
   { key: 'powerNom', dual: true },        // Nominal Power (W) at 20°C
-  { key: 'currentNom', dual: true },      // Nominal current (A)
-  { key: 'currentPeak', dual: true },     // Current at peak power (A)
   { key: 'tempAvg' },                     // Average Surface Temperature (°C)
   { key: 'tempMax' },                     // Maximum Surface Temperature (°C)
-  { key: 'tempAmbient' },                 // Operating ambient temperature (°C)
-  { key: 'heatUp' },                      // Heat-up Time (Seconds)
-  { key: 'emissivity' },                  // Radiative / Convective / Conductive emissivity (%)
+  { key: 'voltage' },                     // Operating Voltage (V)
+  { key: 'frequency' },                   // Frequency (Hz)
+  { key: 'currentPeak', dual: true },     // Current at peak power (A)
+  { key: 'currentNom', dual: true },      // Nominal current (A)
   { key: 'resistance' },                  // Electrical Resistance at 20°C (Ω)
   { key: 'dielectric', sub: true },       // Dielectric Strength (V) + (IEC 60335-1 : 2023 + A11 : 2023)
   { key: 'cop' },                         // Coefficient of Performance (COP)
   { key: 'ir' },                          // IR Radiation Distribution
-  { key: 'endurance' },                   // Endurance (Electrical resistance variation after 2,500 cycles)
+  { key: 'tempAmbient' },                 // Operating ambient temperature (°C)
   { key: 'ip' },                          // Ingress Protection
-  { key: 'weight' },                      // Weight (g)
-  { key: 'thickness' },                   // Thickness of the heating film (mm)
-  { key: 'thicknessLam', aluOnly: true }, // Total thickness laminated (mm)
-  { key: 'warranty' },                    // Warranty
+  { key: 'endurance' },                   // Endurance (Electrical resistance variation after 2,500 cycles)
+  { key: 'heatUp' },                      // Heat-up Time (Seconds)
+  { key: 'emissivity' },                  // Radiative / Convective / Conductive emissivity (%)
+  { key: 'warmUp', multi: 3 },            // Warm-up time at 230 V : 3 paliers « to 120 °C: < 1 min »
+  { key: 'applianceClass' },              // Electrical appliance
+  { key: 'thickness', noTable: true },    // Thickness of the heating film (mm) → liste mécanique
+  { key: 'thicknessLam', noTable: true, aluOnly: true }, // Total thickness laminated (mm) → liste mécanique
+  { key: 'weight', noTable: true },       // Weight (g) → liste mécanique
+  { key: 'warranty', noTable: true },     // Warranty → section de la colonne gauche
 ]
 
 // Cotes en mm : optionnelles et informatives depuis que le schéma est une image chargée par produit (`schemaImage`).
@@ -54,7 +59,8 @@ export const DEFAULT_BRAND = {
 // Valeurs par défaut des specs : presets, blankProduct, et produits mémorisés auxquels il manque une clé.
 const defaultSpecs = () => ({
   voltage: '230-240', frequency: '50-60',
-  powerNom: ['', ''], currentNom: ['', ''], currentPeak: ['', ''],
+  powerPeak: ['', ''], powerNom: ['', ''], currentNom: ['', ''], currentPeak: ['', ''],
+  warmUp: ['', '', ''], applianceClass: 'Compatible with Class I and II thermal systems',
   tempAvg: '', tempMax: '', tempAmbient: '0 to +40', heatUp: '', emissivity: '60 / 30 / 10',
   resistance: '', dielectric: '> 3000', cop: '1', ir: 'Lambertian',
   endurance: '< 5%', ip: '', weight: '', thickness: '', thicknessLam: '', warranty: '10 years',
@@ -126,11 +132,11 @@ const defaultExtras = () => ({
 
 // Sections de la page 2, dans l'ordre d'affichage. Libellés de l'éditeur (FR) ; titres de la fiche dans i18n.page2.
 export const PAGE2_FIELDS = [
-  { key: 'applications', label: 'Introduction (paragraphe sous le titre APPLICATIONS)' },
+  { key: 'applications', label: 'Applications (paragraphe)' },
   { key: 'integration', label: 'Intégration' },
   { key: 'storage', label: 'Stockage' },
   { key: 'compliance', label: 'Conformité et réglementation' },
-  { key: 'testConditions', label: 'Conditions de mesure / d\'essai' },
+  { key: 'testConditions', label: 'Conditions de mesure (après « Unless otherwise specified… »)' },
   { key: 'footnotes', label: 'Notes de bas de page' },
 ]
 
@@ -158,27 +164,31 @@ export const PRESETS = [
   base({
     id: 'abf400-film', name: 'ABF400 FILM', variant: 'film', productNumber: '400',
     subtitle: '400W GRAPHENE HEATING FILM: ABF® 400', date: 'May 2026',
-    specs: { powerNom: ['409 ± 2.5%', '440 ± 2.5%'], currentNom: ['1.7', '1.8'], currentPeak: ['1.98', '2.11'],
-      tempAvg: '102 ± 5', tempMax: '107 ± 2.5', heatUp: '< 150', resistance: '117 ± 3', ip: 'IP 20', weight: '160', thickness: '0.56' },
+    specs: { powerPeak: ['464 ± 2.5%', '498 ± 2.5%'], powerNom: ['409 ± 2.5%', '440 ± 2.5%'], currentNom: ['1.7', '1.8'], currentPeak: ['1.98', '2.11'],
+      tempAvg: '102 ± 5', tempMax: '107 ± 2.5', heatUp: '< 150', resistance: '117 ± 3', ip: 'IP 20', weight: '160', thickness: '0.56',
+      warmUp: ['to 100 °C: 2 min 30 s', 'to 80 °C: < 1 min', 'to 60 °C: < 30 s'] },
   }),
   base({
     id: 'abf400-alu', name: 'ABF400 ALU', variant: 'alu', productNumber: '400', titleSuffix: 'ALU',
     subtitle: 'GRAPHENE HEATING FILM LAMINATED ONTO ALUMINUM: ABF® 400', date: 'May 2026',
-    specs: { powerNom: ['409 ± 2.5%', '440 ± 2.5%'], currentNom: ['1.7', '1.8'], currentPeak: ['1.98', '2.11'],
-      tempAvg: '102 ± 5', tempMax: '107 ± 2.5', heatUp: '< 600', resistance: '117 ± 3', ip: 'IP4X', weight: '1910', thickness: '0.56', thicknessLam: '3.12' },
+    specs: { powerPeak: ['464 ± 2.5%', '498 ± 2.5%'], powerNom: ['409 ± 2.5%', '440 ± 2.5%'], currentNom: ['1.7', '1.8'], currentPeak: ['1.98', '2.11'],
+      tempAvg: '102 ± 5', tempMax: '107 ± 2.5', heatUp: '< 600', resistance: '117 ± 3', ip: 'IP4X', weight: '1910', thickness: '0.56', thicknessLam: '3.12',
+      warmUp: ['to 90 °C: 10 min', 'to 80 °C: 6 min', 'to 60 °C: < 3 min'] },
     dims: { outerW: 410, outerH: 690 },
   }),
   base({
     id: 'abf800-film', name: 'ABF800 FILM', variant: 'film', productNumber: '800',
     subtitle: '800W GRAPHENE HEATING FILM: ABF® 800', date: 'May 2026',
-    specs: { powerNom: ['800 ± 2.5%', '870 ± 2.5%'], currentNom: ['3.4', '3.7'], currentPeak: ['4.5', '3.9'],
-      tempAvg: '140 ± 5', tempMax: '150 ± 2.5', heatUp: '< 90', resistance: '55 ± 3', ip: 'IP 20', weight: '150', thickness: '0.5' },
+    specs: { powerPeak: ['925 ± 2.5%', '1030 ± 2.5%'], powerNom: ['800 ± 2.5%', '870 ± 2.5%'], currentNom: ['3.4', '3.7'], currentPeak: ['4.5', '3.9'],
+      tempAvg: '140 ± 5', tempMax: '150 ± 2.5', heatUp: '< 90', resistance: '55 ± 3', ip: 'IP 20', weight: '150', thickness: '0.5',
+      warmUp: ['to 120 °C: < 1 min', 'to 100 °C: < 30 s', 'to 80 °C: < 20 s'] },
   }),
   base({
     id: 'abf800-alu', name: 'ABF800 ALU', variant: 'alu', productNumber: '800', titleSuffix: 'ALU',
     subtitle: 'GRAPHENE HEATING FILM LAMINATED ONTO ALUMINUM: ABF® 800', date: 'May 2026',
-    specs: { powerNom: ['800 ± 2.5%', '870 ± 2.5%'], currentNom: ['3.4', '3.7'], currentPeak: ['4.5', '3.9'],
-      tempAvg: '140 ± 5', tempMax: '150 ± 2.5', heatUp: '< 360', resistance: '56 ± 3', ip: 'IP4X', weight: '2310', thickness: '0.5', thicknessLam: '3.57' },
+    specs: { powerPeak: ['925 ± 2.5%', '1030 ± 2.5%'], powerNom: ['800 ± 2.5%', '870 ± 2.5%'], currentNom: ['3.4', '3.7'], currentPeak: ['4.5', '3.9'],
+      tempAvg: '140 ± 5', tempMax: '150 ± 2.5', heatUp: '< 360', resistance: '56 ± 3', ip: 'IP4X', weight: '2310', thickness: '0.5', thicknessLam: '3.57',
+      warmUp: ['to 120 °C: < 6 min', 'to 100 °C: 3 min', 'to 80 °C: < 2 min'] },
     dims: { outerW: 410, outerH: 690 },
   }),
   base({
