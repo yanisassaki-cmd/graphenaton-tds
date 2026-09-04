@@ -4,8 +4,7 @@ import { SPEC_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
 import { NAVY, TEAL } from './drawing'
 import { t, specLabel, disclaimerOf } from './i18n'
 import { computeCurve, hasCurveData } from './curve'
-import { ICONS, ICON_VIEW } from './icons'
-import { parseApplications, lines, mechRows, mechLine, warmUpRows, hasText } from './page2'
+import { lines, mechRows, mechLine, warmUpRows, hasText } from './text'
 
 Font.register({
   family: 'Inter',
@@ -13,17 +12,18 @@ Font.register({
 })
 Font.registerHyphenationCallback((w) => [w])
 
-// Mise en page de la fiche (PDF), miroir de Preview.jsx : pt = px × 0,75.
-// Colonne gauche : textes (applications, mécanique, intégration, stockage, garantie, conformité, courbe).
-// Colonne droite : tableau électrique / thermique à bandeau bleu marine, schéma du film (100 pt max), notes.
-const SCHEMA_MAX_PT = 85
+// Fiche sur une page (PDF), miroir de Preview.jsx : pt = px × 0,75.
+// Gauche : textes (applications, mécanique, intégration, stockage, garantie, conformité) puis, calée en bas,
+// la courbe de montée en température. Droite : tableau électrique / thermique puis, calé en bas au même niveau,
+// le schéma du film au format paysage (130 pt max) et les notes. Texte légal sur toute la largeur.
+const SCHEMA_MAX_PT = 130
 
 const GREY = '#5B6270', LINE = '#D9DDE3', MUTED = '#8A8F99', CELL = '#C9CED6', HILITE = '#E8EBF0'
 const s = StyleSheet.create({
   page: { fontFamily: 'Inter', color: NAVY, paddingTop: 28, paddingHorizontal: 40, paddingBottom: 40, fontSize: 7.6 },
   // En-tête deux colonnes : tailles en pt = tailles px de l'aperçu (.sheet) × 0,75
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 15 },
-  hdLeft: { flexShrink: 0, paddingTop: 6 },
+  hdLeft: { flexShrink: 0, paddingTop: 2 },
   hdTitle: { fontSize: 22, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.2 },
   hdLine: { fontSize: 18, color: GREY, lineHeight: 1.25, marginTop: 3 },
   hdRight: { flex: 1, alignItems: 'flex-end' },
@@ -34,12 +34,13 @@ const s = StyleSheet.create({
   brand: { fontSize: 13, fontWeight: 700, letterSpacing: 1.5 },
   brandSub: { fontSize: 6, letterSpacing: 2.5, color: GREY, marginTop: 1 },
   sup: { fontWeight: 800 },
-  subtitle: { fontSize: 10.5, color: GREY, marginTop: 6, paddingBottom: 6, borderBottomWidth: 2.5, borderBottomColor: TEAL },
+  subtitle: { fontSize: 10.5, color: GREY, marginTop: 4, paddingBottom: 6, borderBottomWidth: 2.5, borderBottomColor: TEAL },
   // Corps
   cols: { flexDirection: 'row', gap: 14, marginTop: 8 },
   left: { flex: 1 },
   right: { flex: 1.06 },
   sec: { marginBottom: 6 },
+  bottom: { marginTop: 'auto', marginBottom: 0 }, // courbe calée en bas de la colonne gauche
   sh: { fontSize: 8.2, fontWeight: 700, letterSpacing: 0.3, backgroundColor: HILITE, paddingVertical: 1.2, paddingHorizontal: 4, alignSelf: 'flex-start', marginBottom: 3 },
   p: { fontSize: 7.6, lineHeight: 1.35 },
   li: { flexDirection: 'row', gap: 4, marginBottom: 0.5 },
@@ -51,31 +52,24 @@ const s = StyleSheet.create({
   tblHead: { backgroundColor: NAVY, color: '#FFFFFF', fontSize: 7.8, fontWeight: 700, textAlign: 'center', paddingVertical: 3.5, paddingHorizontal: 4, letterSpacing: 0.3 },
   tbl: { borderWidth: 0.75, borderColor: CELL, borderTopWidth: 0, marginTop: 2 },
   row: { flexDirection: 'row', borderBottomWidth: 0.75, borderBottomColor: CELL },
-  lbl: { width: '61%', paddingVertical: 2.3, paddingHorizontal: 3.5, borderRightWidth: 0.75, borderRightColor: CELL, justifyContent: 'center' },
+  lbl: { width: '63%', paddingVertical: 2, paddingHorizontal: 3.5, borderRightWidth: 0.75, borderRightColor: CELL, justifyContent: 'center' },
   lblText: { fontSize: 7.2, lineHeight: 1.28 },
   sub: { fontSize: 7, color: GREY, lineHeight: 1.28, marginLeft: 6 },
-  val: { width: '39%', paddingVertical: 2.3, paddingHorizontal: 3, justifyContent: 'center' },
+  val: { width: '37%', paddingVertical: 2, paddingHorizontal: 3, justifyContent: 'center' },
   valText: { fontSize: 7.2, lineHeight: 1.28, textAlign: 'center' },
   miss: { color: '#C00000' },
+  film: { marginTop: 'auto' }, // film + notes calés en bas de la colonne droite, au niveau de la courbe
   schema: { marginTop: 6, alignItems: 'center' },
-  schemaImg: { maxHeight: SCHEMA_MAX_PT, maxWidth: '100%', objectFit: 'contain' },
+  schemaImg: { width: '85%', maxHeight: SCHEMA_MAX_PT, objectFit: 'contain' },
+  schemaPh: { borderWidth: 1, borderColor: '#B8BEC8', borderStyle: 'dashed', borderRadius: 4, height: 110 },
   fn: { fontSize: 6.2, color: GREY, lineHeight: 1.3, marginTop: 5 },
   legal: { fontSize: 5.8, color: MUTED, lineHeight: 1.35, textAlign: 'justify', marginTop: 4, paddingTop: 3.5, borderTopWidth: 0.75, borderTopColor: '#E1E4E9' },
   footer: { position: 'absolute', left: 40, right: 40, bottom: 22, borderTopWidth: 0.75, borderTopColor: LINE, paddingTop: 6, flexDirection: 'row', justifyContent: 'space-between' },
   fa: { fontSize: 6.5, color: GREY },
   fs: { fontSize: 7, fontWeight: 700, letterSpacing: 1.5 },
-  // Page 2 : cartes d'applications
-  p2Body: { marginTop: 10 },
-  p2Intro: { fontSize: 8.6, lineHeight: 1.5, marginBottom: 7 },
-  cards: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  card: { width: '48.8%', flexDirection: 'row', gap: 7, alignItems: 'flex-start', backgroundColor: '#F6F8FA', borderWidth: 0.75, borderColor: '#E6E9EE', borderRadius: 4.5, paddingVertical: 5.5, paddingHorizontal: 7.5 },
-  cardIco: { width: 19.5, height: 19.5 },
-  cardBody: { flex: 1 },
-  cardTitle: { fontSize: 8.6, fontWeight: 700, lineHeight: 1.3 },
-  cardDesc: { fontSize: 7.9, color: GREY, lineHeight: 1.4, marginTop: 1.5 },
 })
 
-// Rendu des primitives partagées (curve.js, icons.js) avec les composants SVG de react-pdf.
+// Rendu des primitives partagées (curve.js) avec les composants SVG de react-pdf.
 function PrimsPdf({ prims, viewW, viewH, style }) {
   return (
     <Svg viewBox={`0 0 ${viewW} ${viewH}`} style={style}>
@@ -91,7 +85,6 @@ function PrimsPdf({ prims, viewW, viewH, style }) {
   )
 }
 
-const Icon = ({ name, style }) => <PrimsPdf prims={ICONS[name] || ICONS.dot} viewW={ICON_VIEW} viewH={ICON_VIEW} style={style} />
 
 // Courbe générée (src/curve.js).
 function CurvePdf({ p, T }) {
@@ -167,34 +160,6 @@ function SpecRows({ p, lang, T, lam }) {
   })
 }
 
-// Page 2 optionnelle : applications détaillées en cartes (pictogramme, titre, description).
-function Page2({ p, brand, T, namePt }) {
-  const apps = parseApplications(p.applicationList)
-  return (
-    <Page size="A4" style={s.page}>
-      <Header p={p} brand={brand} T={T} namePt={namePt} />
-      <View style={s.p2Body}>
-        <Text style={s.sh}>{T.page2.applications}</Text>
-        {hasText(p.applications) && <Text style={s.p2Intro}>{p.applications}</Text>}
-        {apps.length > 0 && (
-          <View style={s.cards}>
-            {apps.map((a, i) => (
-              <View key={i} style={s.card} wrap={false}>
-                <Icon name={a.icon} style={s.cardIco} />
-                <View style={s.cardBody}>
-                  <Text style={s.cardTitle}>{a.title}</Text>
-                  {a.desc ? <Text style={s.cardDesc}>{a.desc}</Text> : null}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-      <Footer brand={brand} />
-    </Page>
-  )
-}
-
 // nameSize : taille (px aperçu) du nom du produit calculée par productFontSize() dans le navigateur, pour tenir sur une ligne.
 export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, lang = 'en', nameSize = 46 }) {
   const lam = isLaminated(p)
@@ -209,27 +174,27 @@ export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, lang = 'en',
 
         <View style={s.cols}>
           <View style={s.left}>
-            {hasText(p.applications) && <Sec title={T.page2.applications}><Text style={s.p}>{p.applications}</Text></Sec>}
-            {mech.length > 0 && <Sec title={T.page2.mech}><Dash items={mech.map(mechLine)} /></Sec>}
-            {integ.length > 0 && <Sec title={T.page2.integration}><Dash items={integ} /></Sec>}
-            {hasText(p.storage) && <Sec title={T.page2.storage}><Text style={s.p}>{p.storage}</Text></Sec>}
+            {hasText(p.applications) && <Sec title={T.sections.applications}><Text style={s.p}>{p.applications}</Text></Sec>}
+            {mech.length > 0 && <Sec title={T.sections.mech}><Dash items={mech.map(mechLine)} /></Sec>}
+            {integ.length > 0 && <Sec title={T.sections.integration}><Dash items={integ} /></Sec>}
+            {hasText(p.storage) && <Sec title={T.sections.storage}><Text style={s.p}>{p.storage}</Text></Sec>}
             {hasText(p.specs.warranty) && <Sec title={T.warrantyTitle}><Text style={s.p}>{p.specs.warranty}</Text></Sec>}
-            {compl.length > 0 && <Sec title={T.page2.compliance}><Dash items={compl} /></Sec>}
+            {compl.length > 0 && <Sec title={T.sections.compliance}><Dash items={compl} /></Sec>}
             {(curve || hasText(p.testConditions)) && (
-              <Sec title={T.curveTitle}>
+              <View style={[s.sec, s.bottom]}><Text style={s.sh}>{T.curveTitle}</Text>
                 {hasText(p.testConditions) && <Text style={s.p}>{T.testIntro} {p.testConditions}</Text>}
                 {curve === 'image' && <Image src={p.curveImage} style={s.curveImg} />}
                 {curve === 'svg' && <CurvePdf p={p} T={T} />}
-              </Sec>
+              </View>
             )}
           </View>
           <View style={s.right}>
             <Text style={s.tblHead}>{T.specsTitle}</Text>
             <View style={s.tbl}><SpecRows p={p} lang={lang} T={T} lam={lam} /></View>
-            <View style={s.schema}>
-              {p.schemaImage ? <Image src={p.schemaImage} style={s.schemaImg} /> : <View style={[s.ph, { width: '100%' }]} />}
+            <View style={s.film}>
+              <View style={s.schema}>{p.schemaImage ? <Image src={p.schemaImage} style={s.schemaImg} /> : <View style={s.schemaPh} />}</View>
+              {hasText(p.footnotes) && <Text style={s.fn}>{p.footnotes}</Text>}
             </View>
-            {hasText(p.footnotes) && <Text style={s.fn}>{p.footnotes}</Text>}
           </View>
         </View>
 
@@ -237,7 +202,6 @@ export default function TdsPdf({ product: p, brand = DEFAULT_BRAND, lang = 'en',
         <Footer brand={brand} />
       </Page>
 
-      {p.page2Enabled && <Page2 p={p} brand={brand} T={T} namePt={namePt} />}
     </Document>
   )
 }

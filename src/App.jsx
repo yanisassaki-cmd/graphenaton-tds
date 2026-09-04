@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
-import { PRESETS, SPEC_FIELDS, DIM_FIELDS, PAGE2_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
+import { PRESETS, SPEC_FIELDS, DIM_FIELDS, TEXT_FIELDS, DEFAULT_BRAND, blankProduct, normalizeProduct, isLaminated, slug } from './schema'
 import Preview from './Preview'
 import TdsPdf from './TdsPdf'
 import { productFontSize } from './header'
@@ -94,7 +94,6 @@ export default function App() {
   }, [])
   const [busy, setBusy] = useState('')
   const [toast, setToast] = useState('')
-  const [p2Over, setP2Over] = useState(0) // dépassement (px) de la page 2 dans l'aperçu, pour prévenir avant le PDF
   const fileRef = useRef()
   const xlsRef = useRef()
 
@@ -111,11 +110,6 @@ export default function App() {
 
   const p = products[Math.min(sel, products.length - 1)]
   const lam = isLaminated(p)
-  useEffect(() => {
-    if (!p.page2Enabled) { setP2Over(0); return }
-    let raf = requestAnimationFrame(() => { const el = document.querySelector('.sheet.p2'); setP2Over(el ? Math.max(0, el.scrollHeight - el.clientHeight) : 0) })
-    return () => cancelAnimationFrame(raf)
-  }, [p, lang, brand, tab])
 
   const update = (fn) => setProducts((arr) => arr.map((x, i) => (i === sel ? fn(clone(x)) : x)))
   const setMeta = (k, v) => update((x) => { x[k] = v; return x })
@@ -356,7 +350,7 @@ export default function App() {
         <section>
           <h3>Textes de la fiche (colonne gauche)</h3>
           <div className="grid">
-            {PAGE2_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows={f.key === 'applications' ? 4 : 3} value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
+            {TEXT_FIELDS.map((f) => <label key={f.key} className="wide">{f.label}<textarea rows={f.key === 'applications' ? 4 : 3} value={p[f.key] ?? ''} onChange={(e) => setMeta(f.key, e.target.value)} /></label>)}
             <p className="hint wide" style={{ margin: 0 }}>Intégration et conformité : une ligne par point (liste à tirets). Les sections vides n'apparaissent pas sur la fiche.</p>
             <h3 className="wide" style={{ margin: '6px 0 0' }}>Spécifications mécaniques</h3>
             <label>Longueur (mm)<input value={p.mech?.length ?? ''} placeholder={String(p.dims.outerH ?? '')} onChange={(e) => setMech('length', e.target.value)} /></label>
@@ -367,17 +361,6 @@ export default function App() {
           </div>
         </section>
 
-        <section>
-          <h3>Page 2</h3>
-          <label className="check"><input type="checkbox" checked={!!p.page2Enabled} onChange={(e) => setMeta('page2Enabled', e.target.checked)} />Ajouter une page 2 (applications détaillées en cartes)</label>
-          {p.page2Enabled && (
-            <div className="grid">
-              {p2Over > 6 && <div className="warn wide" style={{ margin: 0 }}>La page 2 déborde d'environ {Math.round(p2Over)} px dans l'aperçu : retirez une carte ou raccourcissez les descriptions.</div>}
-              <label className="wide">Applications en cartes : une par ligne, « Titre : description »<textarea rows="9" value={p.applicationList ?? ''} onChange={(e) => setMeta('applicationList', e.target.value)} /></label>
-              <p className="hint wide" style={{ margin: '-4px 0 0' }}>Le pictogramme est choisi d'après le titre : mobilité / véhicule, plafond, sol, mur, siège / mobilier, industriel, dégivrage / extérieur, bien-être / médical ; sinon un point teal. Le paragraphe « Applications » de la page 1 sert d'introduction.</p>
-            </div>
-          )}
-        </section>
         </div>
       </main>
 

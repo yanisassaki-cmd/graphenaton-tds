@@ -26,7 +26,7 @@ const en = {
   warrantyTitle: 'WARRANTY',
   testIntro: 'Unless otherwise specified, the following conditions apply:',
   disclaimerKey: 'disclaimerEn', // clé de `brand` contenant le texte légal dans cette langue
-  page2: {
+  sections: {
     applications: 'APPLICATIONS',
     integration: 'INTEGRATION',
     storage: 'STORAGE',
@@ -79,7 +79,7 @@ const fr = {
   warrantyTitle: 'GARANTIE',
   testIntro: 'Sauf indication contraire, les conditions suivantes s\'appliquent :',
   disclaimerKey: 'disclaimerFr',
-  page2: {
+  sections: {
     applications: 'APPLICATIONS',
     integration: 'INTÉGRATION',
     storage: 'STOCKAGE',

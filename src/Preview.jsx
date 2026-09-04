@@ -3,16 +3,14 @@ import { SPEC_FIELDS, DEFAULT_BRAND, isLaminated } from './schema'
 import { productFontSize } from './header'
 import { t, specLabel, disclaimerOf } from './i18n'
 import { computeCurve, hasCurveData } from './curve'
-import { ICONS, ICON_VIEW } from './icons'
-import { parseApplications, lines, mechRows, mechLine, warmUpRows, hasText } from './page2'
+import { lines, mechRows, mechLine, warmUpRows, hasText } from './text'
 
-// Mise en page de la fiche (aperçu HTML), miroir de TdsPdf.jsx : px = pt × 1,333.
-// Colonne gauche : textes (applications, mécanique, intégration, stockage, garantie, conformité, courbe).
-// Colonne droite : tableau électrique / thermique à bandeau bleu marine, schéma du film, notes.
+// Fiche sur une page (aperçu HTML), miroir de TdsPdf.jsx : px = pt × 1,333.
+// Gauche : textes (applications, mécanique, intégration, stockage, garantie, conformité) puis, calée en bas,
+// la courbe de montée en température. Droite : tableau électrique / thermique puis, calé en bas au même niveau,
+// le schéma du film au format paysage et les notes. Texte légal sur toute la largeur.
 
-const SCHEMA_MAX_PX = 113 // 85 pt
-
-// Rendu SVG des primitives partagées (curve.js, icons.js) : line / path / circle / rect / text.
+// Rendu SVG des primitives partagées (curve.js) : line / path / circle / rect / text.
 function PrimsSvg({ prims, viewW, viewH, className }) {
   return (
     <svg viewBox={`0 0 ${viewW} ${viewH}`} className={className} xmlns="http://www.w3.org/2000/svg">
@@ -27,8 +25,6 @@ function PrimsSvg({ prims, viewW, viewH, className }) {
   )
 }
 
-const Icon = ({ name, className }) => <PrimsSvg prims={ICONS[name] || ICONS.dot} viewW={ICON_VIEW} viewH={ICON_VIEW} className={className} />
-
 // Courbe générée (src/curve.js) en SVG.
 function CurveSvg({ p, T }) {
   const { prims, viewW, viewH } = computeCurve(p.curvePoints, p.curveAxis, { x: T.curveX, y: T.curveY })
@@ -41,29 +37,7 @@ export const curveContent = (p) =>
   : p.curveMode === 'generated' ? (hasCurveData(p) ? 'svg' : 'placeholder')
   : null
 
-// En-tête commun aux deux pages : titre / société / date à gauche, logo + nom du produit à droite, sous-titre, barre teale.
-function SheetHeader({ p, brand, T, nameSize }) {
-  return (
-    <>
-      <div className="sheet-top">
-        <div className="hd-left">
-          <div className="hd-title">{T.title}</div>
-          <div className="hd-line">{brand.headerCompany}</div>
-          <div className="hd-line">{p.date || <span className="miss">date</span>}</div>
-        </div>
-        <div className="hd-right">
-          {brand.logo ? <img className="logo-img" src={brand.logo} alt="" style={{ height: brand.logoHeight }} /> : <div className="logo"><div className="g">G</div><div className="brand"><b>{brand.company}</b><span>{brand.companySub}</span></div></div>}
-          <div className="hd-product" style={{ fontSize: nameSize }}>ABF<sup>®</sup> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</div>
-        </div>
-      </div>
-      <div className="subtitle">{p.subtitle || <span className="miss">Sous-titre à renseigner</span>}</div>
-    </>
-  )
-}
-
-const Footer = ({ brand }) => <div className="sheet-footer"><span>{brand.address}</span><b>{brand.site}</b></div>
-
-const Sec = ({ title, children }) => <div className="sec"><div className="sh">{title}</div>{children}</div>
+const Sec = ({ title, children, className = '' }) => <div className={'sec ' + className}><div className="sh">{title}</div>{children}</div>
 const Dash = ({ items }) => <ul className="dash">{items.map((l, i) => <li key={i}><span>–</span><div>{l}</div></li>)}</ul>
 const Val = ({ v, na }) => { const empty = !v || !String(v).trim(); return <span className={empty ? 'miss' : ''}>{empty ? na : v}</span> }
 
@@ -88,28 +62,6 @@ function SpecRows({ p, lang, T, lam }) {
   })
 }
 
-// Page 2 optionnelle : applications détaillées en cartes (pictogramme, titre, description).
-function Page2({ p, brand, T, nameSize }) {
-  const apps = parseApplications(p.applicationList)
-  return (
-    <div className="sheet p2">
-      <SheetHeader p={p} brand={brand} T={T} nameSize={nameSize} />
-      <div className="p2-body">
-        <div className="sh">{T.page2.applications}</div>
-        {hasText(p.applications) && <p className="p2-intro">{p.applications}</p>}
-        {apps.length > 0 && (
-          <div className="cards">
-            {apps.map((a, i) => (
-              <div key={i} className="card"><Icon name={a.icon} className="ico" /><div><b>{a.title}</b>{a.desc && <span>{a.desc}</span>}</div></div>
-            ))}
-          </div>
-        )}
-      </div>
-      <Footer brand={brand} />
-    </div>
-  )
-}
-
 export default function Preview({ product: p, brand = DEFAULT_BRAND, lang = 'en' }) {
   const lam = isLaminated(p)
   const T = t(lang)
@@ -120,39 +72,47 @@ export default function Preview({ product: p, brand = DEFAULT_BRAND, lang = 'en'
   useEffect(() => { document.fonts?.ready.then(fontsReady) }, [])
   const nameSize = productFontSize(p, brand, lang)
   return (
-    <>
-      <div className="sheet">
-        <SheetHeader p={p} brand={brand} T={T} nameSize={nameSize} />
-        <div className="cols">
-          <div className="left">
-            {hasText(p.applications) && <Sec title={T.page2.applications}><p>{p.applications}</p></Sec>}
-            {mech.length > 0 && <Sec title={T.page2.mech}><Dash items={mech.map(mechLine)} /></Sec>}
-            {integ.length > 0 && <Sec title={T.page2.integration}><Dash items={integ} /></Sec>}
-            {hasText(p.storage) && <Sec title={T.page2.storage}><p>{p.storage}</p></Sec>}
-            {hasText(p.specs.warranty) && <Sec title={T.warrantyTitle}><p>{p.specs.warranty}</p></Sec>}
-            {compl.length > 0 && <Sec title={T.page2.compliance}><Dash items={compl} /></Sec>}
-            {(curve || hasText(p.testConditions)) && (
-              <Sec title={T.curveTitle}>
-                {hasText(p.testConditions) && <p>{T.testIntro} {p.testConditions}</p>}
-                {curve === 'image' && <img className="curve-img" src={p.curveImage} alt="" />}
-                {curve === 'svg' && <CurveSvg p={p} T={T} />}
-                {curve === 'placeholder' && <div className="ph">Courbe de température à charger</div>}
-              </Sec>
-            )}
-          </div>
-          <div className="right">
-            <div className="tbl-head">{T.specsTitle}</div>
-            <table className="spec"><tbody><SpecRows p={p} lang={lang} T={T} lam={lam} /></tbody></table>
-            <div className="schema">
-              {p.schemaImage ? <img src={p.schemaImage} alt="" style={{ maxHeight: SCHEMA_MAX_PX }} /> : <div className="ph">Schéma du film à charger</div>}
-            </div>
+    <div className="sheet">
+      <div className="sheet-top">
+        <div className="hd-left">
+          <div className="hd-title">{T.title}</div>
+          <div className="hd-line">{brand.headerCompany}</div>
+          <div className="hd-line">{p.date || <span className="miss">date</span>}</div>
+        </div>
+        <div className="hd-right">
+          {brand.logo ? <img className="logo-img" src={brand.logo} alt="" style={{ height: brand.logoHeight }} /> : <div className="logo"><div className="g">G</div><div className="brand"><b>{brand.company}</b><span>{brand.companySub}</span></div></div>}
+          <div className="hd-product" style={{ fontSize: nameSize }}>ABF<sup>®</sup> {p.productNumber}{p.titleSuffix ? ' ' + p.titleSuffix : ''}</div>
+        </div>
+      </div>
+      <div className="subtitle">{p.subtitle || <span className="miss">Sous-titre à renseigner</span>}</div>
+      <div className="cols">
+        <div className="left">
+          {hasText(p.applications) && <Sec title={T.sections.applications}><p>{p.applications}</p></Sec>}
+          {mech.length > 0 && <Sec title={T.sections.mech}><Dash items={mech.map(mechLine)} /></Sec>}
+          {integ.length > 0 && <Sec title={T.sections.integration}><Dash items={integ} /></Sec>}
+          {hasText(p.storage) && <Sec title={T.sections.storage}><p>{p.storage}</p></Sec>}
+          {hasText(p.specs.warranty) && <Sec title={T.warrantyTitle}><p>{p.specs.warranty}</p></Sec>}
+          {compl.length > 0 && <Sec title={T.sections.compliance}><Dash items={compl} /></Sec>}
+          {(curve || hasText(p.testConditions)) && (
+            <Sec title={T.curveTitle} className="bottom">
+              {hasText(p.testConditions) && <p>{T.testIntro} {p.testConditions}</p>}
+              {curve === 'image' && <img className="curve-img" src={p.curveImage} alt="" />}
+              {curve === 'svg' && <CurveSvg p={p} T={T} />}
+              {curve === 'placeholder' && <div className="ph">Courbe de température à charger</div>}
+            </Sec>
+          )}
+        </div>
+        <div className="right">
+          <div className="tbl-head">{T.specsTitle}</div>
+          <table className="spec"><tbody><SpecRows p={p} lang={lang} T={T} lam={lam} /></tbody></table>
+          <div className="film">
+            <div className="schema">{p.schemaImage ? <img src={p.schemaImage} alt="" /> : <div className="ph">Schéma du film à charger (format paysage)</div>}</div>
             {hasText(p.footnotes) && <p className="fn">{p.footnotes}</p>}
           </div>
         </div>
-        <div className="legal">{disclaimerOf(lang, brand)}</div>
-        <Footer brand={brand} />
       </div>
-      {p.page2Enabled && <Page2 p={p} brand={brand} T={T} nameSize={nameSize} />}
-    </>
+      <div className="legal">{disclaimerOf(lang, brand)}</div>
+      <div className="sheet-footer"><span>{brand.address}</span><b>{brand.site}</b></div>
+    </div>
   )
 }
